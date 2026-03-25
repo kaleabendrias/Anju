@@ -1,0 +1,2 @@
+# Bootstrap configuration is deprecated in Spring Cloud 2023.0+
+# Nacos configuration is now in application.yml

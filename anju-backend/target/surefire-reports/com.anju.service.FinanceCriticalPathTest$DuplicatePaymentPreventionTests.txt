@@ -1,0 +1,28 @@
+-------------------------------------------------------------------------------
+Test set: com.anju.service.FinanceCriticalPathTest$DuplicatePaymentPreventionTests
+-------------------------------------------------------------------------------
+Tests run: 3, Failures: 0, Errors: 3, Skipped: 0, Time elapsed: 0.017 s <<< FAILURE! -- in com.anju.service.FinanceCriticalPathTest$DuplicatePaymentPreventionTests
+com.anju.service.FinanceCriticalPathTest$DuplicatePaymentPreventionTests.preventDuplicatePaymentWithSameIdempotencyKey -- Time elapsed: 0.003 s <<< ERROR!
+java.lang.NullPointerException: Cannot invoke "com.anju.entity.User.getId()" because "this.this$0.operatorUser" is null
+	at com.anju.service.FinanceCriticalPathTest$DuplicatePaymentPreventionTests.preventDuplicatePaymentWithSameIdempotencyKey(FinanceCriticalPathTest.java:69)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+com.anju.service.FinanceCriticalPathTest$DuplicatePaymentPreventionTests.allowPaymentWithDifferentIdempotencyKey -- Time elapsed: 0.004 s <<< ERROR!
+java.lang.NullPointerException: Cannot invoke "com.anju.entity.User.getId()" because "this.this$0.operatorUser" is null
+	at com.anju.service.FinanceCriticalPathTest$DuplicatePaymentPreventionTests.allowPaymentWithDifferentIdempotencyKey(FinanceCriticalPathTest.java:97)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+com.anju.service.FinanceCriticalPathTest$DuplicatePaymentPreventionTests.preventDuplicateRefundWithSameIdempotencyKey -- Time elapsed: 0.005 s <<< ERROR!
+java.lang.NullPointerException: Cannot invoke "com.anju.entity.User.getId()" because "this.this$0.operatorUser" is null
+	at com.anju.service.FinanceCriticalPathTest$DuplicatePaymentPreventionTests.preventDuplicateRefundWithSameIdempotencyKey(FinanceCriticalPathTest.java:133)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+

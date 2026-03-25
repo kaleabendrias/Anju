@@ -1,0 +1,60 @@
+spring:
+  application:
+    name: anju-backend
+  config:
+    import: optional:nacos:common.yaml
+  cloud:
+    nacos:
+      config:
+        server-addr: nacos:8848
+      discovery:
+        server-addr: nacos:8848
+        enabled: true
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:anju_db}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+
+security:
+  jwt:
+    secret: ${JWT_SECRET:}
+    expiration: ${JWT_EXPIRATION:86400000}
+  encryption:
+    key: ${ENCRYPTION_KEY:}
+  fail-on-missing-secrets: ${FAIL_ON_MISSING_SECRETS:true}
+
+file:
+  storage:
+    path: ${FILE_STORAGE_PATH:./storage}
+  retention:
+    days: ${FILE_RETENTION_DAYS:30}
+
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when_authorized
+
+logging:
+  level:
+    root: INFO
+    com.anju: INFO
+    org.springframework.security: WARN

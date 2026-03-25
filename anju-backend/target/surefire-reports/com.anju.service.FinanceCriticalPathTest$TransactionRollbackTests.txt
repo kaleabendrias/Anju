@@ -1,0 +1,12 @@
+-------------------------------------------------------------------------------
+Test set: com.anju.service.FinanceCriticalPathTest$TransactionRollbackTests
+-------------------------------------------------------------------------------
+Tests run: 1, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 0.012 s <<< FAILURE! -- in com.anju.service.FinanceCriticalPathTest$TransactionRollbackTests
+com.anju.service.FinanceCriticalPathTest$TransactionRollbackTests.rollbackOnInvalidOperation -- Time elapsed: 0.009 s <<< ERROR!
+java.lang.NullPointerException: Cannot invoke "com.anju.entity.User.getId()" because "this.this$0.operatorUser" is null
+	at com.anju.service.FinanceCriticalPathTest$TransactionRollbackTests.rollbackOnInvalidOperation(FinanceCriticalPathTest.java:310)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+

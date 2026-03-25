@@ -1,0 +1,23 @@
+-------------------------------------------------------------------------------
+Test set: com.anju.service.FinancialServiceTest$RefundProcessingTests
+-------------------------------------------------------------------------------
+Tests run: 6, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.013 s <<< FAILURE! -- in com.anju.service.FinancialServiceTest$RefundProcessingTests
+com.anju.service.FinancialServiceTest$RefundProcessingTests.shouldPreventRefundWithoutOriginalPayment -- Time elapsed: 0.002 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: Unexpected exception type thrown, expected: <com.anju.exception.BusinessException> but was: <com.anju.exception.SecurityExceptionHandler.ResourceNotFoundException>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:67)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:35)
+	at org.junit.jupiter.api.Assertions.assertThrows(Assertions.java:3115)
+	at com.anju.service.FinancialServiceTest$RefundProcessingTests.shouldPreventRefundWithoutOriginalPayment(FinancialServiceTest.java:186)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+Caused by: com.anju.exception.SecurityExceptionHandler$ResourceNotFoundException: Original transaction not found: 999
+	at com.anju.service.FinancialService.lambda$processRefund$2(FinancialService.java:99)
+	at java.base/java.util.Optional.orElseThrow(Optional.java:403)
+	at com.anju.service.FinancialService.processRefund(FinancialService.java:99)
+	at com.anju.service.FinancialServiceTest$RefundProcessingTests.lambda$shouldPreventRefundWithoutOriginalPayment$1(FinancialServiceTest.java:187)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:53)
+	... 7 more
+

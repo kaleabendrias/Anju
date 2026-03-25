@@ -1,0 +1,30 @@
+-------------------------------------------------------------------------------
+Test set: com.anju.service.FileServiceTest$SoftDeleteTests
+-------------------------------------------------------------------------------
+Tests run: 2, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.034 s <<< FAILURE! -- in com.anju.service.FileServiceTest$SoftDeleteTests
+com.anju.service.FileServiceTest$SoftDeleteTests.shouldSetExpirationTimeOnSoftDelete -- Time elapsed: 0.030 s <<< FAILURE!
+Wanted but not invoked:
+fileRecordRepository.softDelete(
+    1L,
+    <custom argument matcher>,
+    <any>,
+    100L
+);
+-> at com.anju.service.FileServiceTest$SoftDeleteTests.shouldSetExpirationTimeOnSoftDelete(FileServiceTest.java:248)
+
+However, there were exactly 2 interactions with this mock:
+fileRecordRepository.findById(1L);
+-> at com.anju.service.FileService.softDeleteFile(FileService.java:198)
+
+fileRecordRepository.save(
+    FileRecord(id=1, logicalId=null, fileHash=hash123, originalName=test.pdf, fileType=null, size=null, versionNumber=1, isDeleted=true, isActive=true, expirationTime=2026-04-24T06:42:56.337272982, storagePath=null, mimeType=null, uploadedBy=null, contentDisposition=null, createdAt=null, updatedAt=null, deletedAt=2026-03-25T06:42:56.337284795, deletedBy=100)
+);
+-> at com.anju.service.FileService.softDeleteFile(FileService.java:212)
+
+
+	at com.anju.service.FileServiceTest$SoftDeleteTests.shouldSetExpirationTimeOnSoftDelete(FileServiceTest.java:248)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+

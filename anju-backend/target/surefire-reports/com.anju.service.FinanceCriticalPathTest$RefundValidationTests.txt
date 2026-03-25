@@ -1,0 +1,68 @@
+-------------------------------------------------------------------------------
+Test set: com.anju.service.FinanceCriticalPathTest$RefundValidationTests
+-------------------------------------------------------------------------------
+Tests run: 4, Failures: 4, Errors: 0, Skipped: 0, Time elapsed: 0.037 s <<< FAILURE! -- in com.anju.service.FinanceCriticalPathTest$RefundValidationTests
+com.anju.service.FinanceCriticalPathTest$RefundValidationTests.rejectRefundForNonExistentTransaction -- Time elapsed: 0.004 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: Unexpected exception type thrown, expected: <com.anju.exception.BusinessException> but was: <java.lang.NullPointerException>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:67)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:35)
+	at org.junit.jupiter.api.Assertions.assertThrows(Assertions.java:3115)
+	at com.anju.service.FinanceCriticalPathTest$RefundValidationTests.rejectRefundForNonExistentTransaction(FinanceCriticalPathTest.java:216)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+Caused by: java.lang.NullPointerException: Cannot invoke "com.anju.entity.User.getId()" because "this.this$0.operatorUser" is null
+	at com.anju.service.FinanceCriticalPathTest$RefundValidationTests.lambda$rejectRefundForNonExistentTransaction$2(FinanceCriticalPathTest.java:217)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:53)
+	... 7 more
+
+com.anju.service.FinanceCriticalPathTest$RefundValidationTests.rejectRefundForNonPaymentTransaction -- Time elapsed: 0.008 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: Unexpected exception type thrown, expected: <com.anju.exception.BusinessException> but was: <java.lang.NullPointerException>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:67)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:35)
+	at org.junit.jupiter.api.Assertions.assertThrows(Assertions.java:3115)
+	at com.anju.service.FinanceCriticalPathTest$RefundValidationTests.rejectRefundForNonPaymentTransaction(FinanceCriticalPathTest.java:240)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+Caused by: java.lang.NullPointerException: Cannot invoke "com.anju.entity.User.getId()" because "this.this$0.operatorUser" is null
+	at com.anju.service.FinanceCriticalPathTest$RefundValidationTests.lambda$rejectRefundForNonPaymentTransaction$3(FinanceCriticalPathTest.java:241)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:53)
+	... 7 more
+
+com.anju.service.FinanceCriticalPathTest$RefundValidationTests.rejectRefundForNonRefundableTransaction -- Time elapsed: 0.006 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: Unexpected exception type thrown, expected: <com.anju.exception.BusinessException> but was: <java.lang.NullPointerException>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:67)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:35)
+	at org.junit.jupiter.api.Assertions.assertThrows(Assertions.java:3115)
+	at com.anju.service.FinanceCriticalPathTest$RefundValidationTests.rejectRefundForNonRefundableTransaction(FinanceCriticalPathTest.java:167)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+Caused by: java.lang.NullPointerException: Cannot invoke "com.anju.entity.User.getId()" because "this.this$0.operatorUser" is null
+	at com.anju.service.FinanceCriticalPathTest$RefundValidationTests.lambda$rejectRefundForNonRefundableTransaction$0(FinanceCriticalPathTest.java:168)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:53)
+	... 7 more
+
+com.anju.service.FinanceCriticalPathTest$RefundValidationTests.rejectRefundForFullyRefundedTransaction -- Time elapsed: 0.008 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: Unexpected exception type thrown, expected: <com.anju.exception.BusinessException> but was: <java.lang.NullPointerException>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:67)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:35)
+	at org.junit.jupiter.api.Assertions.assertThrows(Assertions.java:3115)
+	at com.anju.service.FinanceCriticalPathTest$RefundValidationTests.rejectRefundForFullyRefundedTransaction(FinanceCriticalPathTest.java:201)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+Caused by: java.lang.NullPointerException: Cannot invoke "com.anju.entity.User.getId()" because "this.this$0.operatorUser" is null
+	at com.anju.service.FinanceCriticalPathTest$RefundValidationTests.lambda$rejectRefundForFullyRefundedTransaction$1(FinanceCriticalPathTest.java:202)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:53)
+	... 7 more
+

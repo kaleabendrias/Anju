@@ -1,0 +1,37 @@
+-------------------------------------------------------------------------------
+Test set: com.anju.service.FinancialServiceTest$PaymentRecordingTests
+-------------------------------------------------------------------------------
+Tests run: 3, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.008 s <<< FAILURE! -- in com.anju.service.FinancialServiceTest$PaymentRecordingTests
+com.anju.service.FinancialServiceTest$PaymentRecordingTests.shouldRecordNewPayment -- Time elapsed: 0.003 s <<< FAILURE!
+Wanted but not invoked:
+auditLogService.logFinancialOperation(
+    <any>,
+    "TRANSACTION",
+    "PAYMENT",
+    1L,
+    <any>,
+    <any>
+);
+-> at com.anju.service.AuditLogService.logFinancialOperation(AuditLogService.java:50)
+
+However, there was exactly 1 interaction with this mock:
+auditLogService.logOperation(
+    1L,
+    "TRANSACTION",
+    "PAYMENT",
+    1L,
+    "testuser",
+    "{"trx_id":"TRX123","amount":"100.00","channel":"ALIPAY"}",
+    "Recorded payment: TRX123",
+    null
+);
+-> at com.anju.service.FinancialService.recordPayment(FinancialService.java:65)
+
+
+	at com.anju.service.AuditLogService.logFinancialOperation(AuditLogService.java:50)
+	at com.anju.service.FinancialServiceTest$PaymentRecordingTests.shouldRecordNewPayment(FinancialServiceTest.java:100)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
