@@ -2,8 +2,10 @@ package com.anju.service;
 
 import com.anju.entity.AuditLog;
 import com.anju.repository.AuditLogRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+// import lombok.RequiredArgsConstructor;
+// import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,9 +14,11 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
-@RequiredArgsConstructor
-@Slf4j
+// @RequiredArgsConstructor
+// @Slf4j
 public class AuditLogService {
+
+    private static final Logger log = LoggerFactory.getLogger(AuditLogService.class);
 
     public static final String OPERATION_CREATE = "CREATE";
     public static final String OPERATION_UPDATE = "UPDATE";
@@ -23,6 +27,10 @@ public class AuditLogService {
     public static final String OPERATION_REFUND = "REFUND";
 
     private final AuditLogRepository auditLogRepository;
+
+    public AuditLogService(AuditLogRepository auditLogRepository) {
+        this.auditLogRepository = auditLogRepository;
+    }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void logOperation(Long entityId, String entityType, String operation, 

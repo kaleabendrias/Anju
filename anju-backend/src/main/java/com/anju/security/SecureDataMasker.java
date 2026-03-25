@@ -22,6 +22,9 @@ public class SecureDataMasker {
     private static final Pattern ID_PATTERN = Pattern.compile("^\\d{6,}$");
     private static final Pattern PHONE_PATTERN = Pattern.compile("^1[3-9]\\d{9}$");
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    private static final Pattern BANK_ACCOUNT_PATTERN = Pattern.compile("^\\d{10,20}$");
+    private static final Pattern CREDIT_CARD_PATTERN = Pattern.compile("^\\d{13,19}$");
+    private static final Pattern SECRET_PATTERN = Pattern.compile("^[a-zA-Z0-9+/=]{16,}$");
 
     private final SecureRandom secureRandom;
     private final SecretKey encryptionKey;
@@ -73,6 +76,54 @@ public class SecureDataMasker {
             return null;
         }
         return mask(value);
+    }
+
+    public String maskPassword(String password) {
+        if (password == null || password.isEmpty()) {
+            return null;
+        }
+        if (password.length() <= 2) {
+            return "*".repeat(password.length());
+        }
+        return password.substring(0, 1) + "*".repeat(Math.min(password.length() - 2, 8)) + password.substring(password.length() - 1);
+    }
+
+    public String maskBankAccount(String bankAccount) {
+        if (bankAccount == null || bankAccount.isEmpty()) {
+            return null;
+        }
+        if (BANK_ACCOUNT_PATTERN.matcher(bankAccount).matches()) {
+            if (bankAccount.length() >= 12) {
+                return bankAccount.substring(0, 4) + "****" + bankAccount.substring(bankAccount.length() - 4);
+            }
+            return "****" + bankAccount.substring(bankAccount.length() - 4);
+        }
+        return mask(bankAccount);
+    }
+
+    public String maskCreditCard(String creditCard) {
+        if (creditCard == null || creditCard.isEmpty()) {
+            return null;
+        }
+        if (CREDIT_CARD_PATTERN.matcher(creditCard).matches()) {
+            if (creditCard.length() >= 13) {
+                return creditCard.substring(0, 4) + "****" + creditCard.substring(creditCard.length() - 4);
+            }
+            return "****" + creditCard.substring(creditCard.length() - 4);
+        }
+        return mask(creditCard);
+    }
+
+    public String maskSecret(String secret) {
+        if (secret == null || secret.isEmpty()) {
+            return null;
+        }
+        if (SECRET_PATTERN.matcher(secret).matches()) {
+            if (secret.length() >= 8) {
+                return secret.substring(0, 4) + "****" + secret.substring(secret.length() - 4);
+            }
+        }
+        return mask(secret);
     }
 
     public String mask(String value) {

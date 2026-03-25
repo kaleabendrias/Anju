@@ -1,8 +1,8 @@
 package com.anju.security;
 
-import lombok.Getter;
+// import lombok.Getter;
 
-@Getter
+// @Getter
 public enum SensitiveAction {
     INVOICE_ISSUE("invoice_issue", true),
     INVOICE_REJECT("invoice_reject", true),
@@ -19,5 +19,13 @@ public enum SensitiveAction {
     SensitiveAction(String code, boolean requiresSecondaryPassword) {
         this.code = code;
         this.requiresSecondaryPassword = requiresSecondaryPassword;
+    }
+
+    public String getCode() {
+        return code;
+    }
+
+    public boolean isRequiresSecondaryPassword() {
+        return requiresSecondaryPassword;
     }
 }

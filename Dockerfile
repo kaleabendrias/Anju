@@ -1,18 +1,26 @@
-FROM eclipse-temurin:17-jdk-alpine AS builder
+FROM eclipse-temurin:17-jdk AS builder
 
 WORKDIR /app
 
 COPY anju-backend/pom.xml .
 COPY anju-backend/src ./src
 
-RUN apk add --no-cache maven && \
-    mvn clean package -DskipTests
+RUN apt-get update && apt-get install -y curl wget && \
+    wget -q https://archive.apache.org/dist/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz && \
+    tar -xzf apache-maven-3.9.6-bin.tar.gz -C /usr/local --strip-components=1 && \
+    rm apache-maven-3.9.6-bin.tar.gz && \
+    mvn dependency:resolve clean package -DskipTests && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-FROM eclipse-temurin:17-jdk-alpine
+FROM eclipse-temurin:17-jdk
 
 WORKDIR /app
 
-RUN apk add --no-cache curl bash maven
+RUN apt-get update && apt-get install -y curl wget && \
+    wget -q https://archive.apache.org/dist/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz && \
+    tar -xzf apache-maven-3.9.6-bin.tar.gz -C /usr/local --strip-components=1 && \
+    rm apache-maven-3.9.6-bin.tar.gz && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 COPY --from=builder /app/target/*.jar /app/app.jar
 COPY --from=builder /app/pom.xml /app/pom.xml

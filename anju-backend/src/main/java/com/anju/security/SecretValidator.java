@@ -1,37 +1,49 @@
 package com.anju.security;
 
 import jakarta.annotation.PostConstruct;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+// import lombok.Getter;
+// import lombok.RequiredArgsConstructor;
+// import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
-@RequiredArgsConstructor
-@Slf4j
+// @RequiredArgsConstructor
+// @Slf4j
 public class SecretValidator {
+
+    private static final Logger log = LoggerFactory.getLogger(SecretValidator.class);
 
     private static final int MIN_JWT_SECRET_LENGTH = 64;
     private static final int MIN_ENCRYPTION_KEY_LENGTH = 16;
 
-    @Value("${jwt.secret:}")
+    @Value("${security.jwt.secret:}")
     private String jwtSecret;
 
     @Value("${security.encryption.key:}")
     private String encryptionKey;
 
-    @Value("${jwt.secret.override:false}")
+    @Value("${security.jwt.secret.override:false}")
     private boolean jwtSecretOverride;
 
     @Value("${security.fail-on-missing-secrets:true}")
     private boolean failOnMissingSecrets;
 
-    @Getter
+    // @Getter
     private boolean jwtSecretValid = false;
 
-    @Getter
+    // @Getter
     private boolean encryptionKeyValid = false;
+
+    public boolean isJwtSecretValid() {
+        return jwtSecretValid;
+    }
+
+    public boolean isEncryptionKeyValid() {
+        return encryptionKeyValid;
+    }
 
     @PostConstruct
     public void validateSecrets() {

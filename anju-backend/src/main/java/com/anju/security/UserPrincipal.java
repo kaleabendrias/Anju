@@ -1,7 +1,7 @@
 package com.anju.security;
 
 import com.anju.entity.User;
-import lombok.Getter;
+// import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -10,7 +10,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
-@Getter
+// @Getter
 public class UserPrincipal implements UserDetails {
 
     private final Long id;
@@ -33,6 +33,14 @@ public class UserPrincipal implements UserDetails {
         this.password = null;
         this.role = role;
         this.authorities = authorities;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public String getRole() {
+        return role;
     }
 
     @Override

@@ -18,12 +18,12 @@ public class JwtTokenProvider {
     private final long expirationMs;
 
     public JwtTokenProvider(
-            @Value("${jwt.secret}") 
+            @Value("${security.jwt.secret}") 
             String secret,
-            @Value("${jwt.expiration:86400000}") 
+            @Value("${security.jwt.expiration:86400000}") 
             long expirationMs) {
         if (secret == null || secret.isEmpty() || secret.length() < 32) {
-            throw new IllegalArgumentException("JWT secret must be at least 32 characters. Please set the 'jwt.secret' property in your configuration.");
+            throw new IllegalArgumentException("JWT secret must be at least 32 characters. Please set the 'security.jwt.secret' property in your configuration.");
         }
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expirationMs = expirationMs;

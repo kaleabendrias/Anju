@@ -28,8 +28,6 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
 
     boolean existsByIdempotencyKey(String idempotencyKey);
 
-    List<Appointment> findByOperatorId(Long operatorId);
-
     @Query("SELECT a FROM Appointment a WHERE a.status = :status AND a.createdAt < :threshold")
     List<Appointment> findStaleAppointments(
             @Param("status") AppointmentStatus status, 
