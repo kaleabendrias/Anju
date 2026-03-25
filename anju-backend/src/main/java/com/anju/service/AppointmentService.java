@@ -19,9 +19,16 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
+import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Service
 public class AppointmentService {
@@ -37,6 +44,8 @@ public class AppointmentService {
     private static final int AUTO_CANCEL_MINUTES = 15;
     private static final int ADVANCE_BOOKING_HOURS = 24;
     private static final Set<Integer> STANDARD_DURATIONS = Set.of(15, 30, 60, 90);
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyMMdd");
+    private static final Random RANDOM = new Random();
 
     public AppointmentService(AppointmentRepository appointmentRepository, AuditLogService auditLogService) {
         this.appointmentRepository = appointmentRepository;
@@ -45,12 +54,26 @@ public class AppointmentService {
 
     @Transactional
     public AppointmentResponse createAppointment(AppointmentCreateRequest request, Long operatorId, String operatorRole) {
+        if (request.getIdempotencyKey() != null && !request.getIdempotencyKey().isBlank()) {
+            return appointmentRepository.findByIdempotencyKey(request.getIdempotencyKey())
+                    .map(existing -> {
+                        log.info("Returning existing appointment for idempotency key: {}", request.getIdempotencyKey());
+                        return AppointmentResponse.fromEntity(existing);
+                    })
+                    .orElseGet(() -> createAppointmentInternal(request, operatorId));
+        }
+        return createAppointmentInternal(request, operatorId);
+    }
+
+    private AppointmentResponse createAppointmentInternal(AppointmentCreateRequest request, Long operatorId) {
         validateServiceTypeAndDuration(request);
         validateTimeRange(request.getStartTime(), request.getEndTime(), true);
         checkConflicts(request.getAccompanyingStaffId(), request.getResourceId(), 
                 request.getStartTime(), request.getEndTime(), null);
 
         Appointment appointment = Appointment.builder()
+                .uniqueAppointmentNumber(generateUniqueAppointmentNumber())
+                .idempotencyKey(request.getIdempotencyKey())
                 .serviceType(request.getServiceType())
                 .orderAmount(request.getOrderAmount())
                 .status(AppointmentStatus.PENDING)
@@ -219,10 +242,26 @@ public class AppointmentService {
                 .collect(Collectors.toList());
     }
 
+    public Page<AppointmentResponse> getAllAppointments(Long operatorId, String operatorRole, Pageable pageable) {
+        Page<Appointment> appointments;
+        
+        if ("ADMIN".equals(operatorRole) || "DISPATCHER".equals(operatorRole)) {
+            appointments = appointmentRepository.findAll(pageable);
+        } else {
+            appointments = appointmentRepository.findByOperatorId(operatorId, pageable);
+        }
+        
+        return appointments.map(AppointmentResponse::fromEntity);
+    }
+
     public List<AppointmentResponse> getAppointmentsByStatus(AppointmentStatus status) {
         return appointmentRepository.findByStatus(status).stream()
                 .map(AppointmentResponse::fromEntity)
                 .collect(Collectors.toList());
+    }
+
+    public Page<AppointmentResponse> getAppointmentsByStatus(AppointmentStatus status, Pageable pageable) {
+        return appointmentRepository.findByStatus(status, pageable).map(AppointmentResponse::fromEntity);
     }
 
     @Transactional
@@ -507,5 +546,11 @@ public class AppointmentService {
                 throw new BusinessException("Resource (ID: " + resourceId + ") is already booked in this time slot");
             }
         }
+    }
+
+    private String generateUniqueAppointmentNumber() {
+        String datePrefix = LocalDateTime.now().format(DATE_FORMATTER);
+        int randomPart = ThreadLocalRandom.current().nextInt(100000, 999999);
+        return "APT" + datePrefix + randomPart;
     }
 }

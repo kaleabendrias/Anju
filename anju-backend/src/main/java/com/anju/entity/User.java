@@ -1,5 +1,7 @@
 package com.anju.entity;
 
+import com.anju.security.EncryptedStringConverter;
+import com.anju.security.SensitiveField;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -35,6 +37,16 @@ public class User implements UserDetails {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Role role;
+
+    @Convert(converter = EncryptedStringConverter.class)
+    @Column(name = "email_encrypted")
+    @SensitiveField(description = "User email address")
+    private String email;
+
+    @Convert(converter = EncryptedStringConverter.class)
+    @Column(name = "phone_encrypted", length = 500)
+    @SensitiveField(description = "User phone number")
+    private String phone;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

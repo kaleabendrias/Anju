@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS users (
     username VARCHAR(50) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     role VARCHAR(20) NOT NULL,
+    email_encrypted TEXT,
+    phone_encrypted TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -26,6 +28,8 @@ CREATE TABLE IF NOT EXISTS properties (
 
 CREATE TABLE IF NOT EXISTS appointments (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    unique_appointment_number VARCHAR(20) UNIQUE,
+    idempotency_key VARCHAR(64) UNIQUE,
     order_amount DECIMAL(12, 2),
     status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
     start_time DATETIME NOT NULL,
@@ -38,9 +42,16 @@ CREATE TABLE IF NOT EXISTS appointments (
     penalty_amount DECIMAL(12, 2),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    operator_id BIGINT,
+    cancel_reason VARCHAR(255),
+    penalty_reason VARCHAR(255),
+    service_type VARCHAR(30) NOT NULL DEFAULT 'STANDARD_CONSULTATION',
     INDEX idx_appointment_time (start_time, end_time),
     INDEX idx_medical_staff (accompanying_staff_id),
-    INDEX idx_resource (resource_id)
+    INDEX idx_resource (resource_id),
+    INDEX idx_unique_appointment_number (unique_appointment_number),
+    INDEX idx_idempotency_key (idempotency_key),
+    INDEX idx_service_type (service_type)
 );
 
 CREATE TABLE IF NOT EXISTS transactions (

@@ -3,6 +3,7 @@ package com.anju.controller;
 import com.anju.dto.*;
 import com.anju.security.UserPrincipal;
 import com.anju.service.FileService;
+import com.anju.service.FileThrottleService;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -21,9 +22,11 @@ import java.util.List;
 public class FileController {
 
     private final FileService fileService;
+    private final FileThrottleService fileThrottleService;
 
-    public FileController(FileService fileService) {
+    public FileController(FileService fileService, FileThrottleService fileThrottleService) {
         this.fileService = fileService;
+        this.fileThrottleService = fileThrottleService;
     }
 
     @PostMapping("/upload/init")
@@ -35,9 +38,19 @@ public class FileController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(ApiResponse.error("Authentication required"));
         }
-        InitUploadResponse response = fileService.initUpload(request, principal.getId(), 
-                principal.getUsername(), principal.getRole());
-        return ResponseEntity.ok(ApiResponse.success(response));
+        
+        if (!fileThrottleService.tryAcquireUploadSlot(principal.getUsername())) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(ApiResponse.error("Upload concurrency limit reached. Please try again later."));
+        }
+        
+        try {
+            InitUploadResponse response = fileService.initUpload(request, principal.getId(), 
+                    principal.getUsername(), principal.getRole());
+            return ResponseEntity.ok(ApiResponse.success(response));
+        } finally {
+            fileThrottleService.releaseUploadSlot(principal.getUsername());
+        }
     }
 
     @PostMapping("/upload/chunk")
@@ -52,6 +65,16 @@ public class FileController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(ApiResponse.error("Authentication required"));
         }
+        
+        if (data != null) {
+            fileThrottleService.recordBytesUploaded(principal.getUsername(), data.length);
+            FileThrottleService.ThrottleStatus status = fileThrottleService.getUploadStatus(principal.getUsername());
+            if (!status.allowed()) {
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                        .body(ApiResponse.error("Upload bandwidth limit exceeded. Please try again later."));
+            }
+        }
+        
         ChunkUploadResponse response = fileService.uploadChunk(uploadId, chunkIndex, totalChunks, data, 
                 principal.getId(), principal.getRole());
         return ResponseEntity.ok(ApiResponse.success(response));
@@ -81,9 +104,26 @@ public class FileController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(ApiResponse.error("Authentication required"));
         }
-        FileRecordResponse response = fileService.uploadSimple(file, logicalId, principal.getId(), 
-                principal.getUsername(), principal.getRole());
-        return ResponseEntity.ok(ApiResponse.success("File uploaded", response));
+        
+        if (!fileThrottleService.tryAcquireUploadSlot(principal.getUsername())) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(ApiResponse.error("Upload concurrency limit reached. Please try again later."));
+        }
+        
+        try {
+            fileThrottleService.recordBytesUploaded(principal.getUsername(), file.getSize());
+            FileThrottleService.ThrottleStatus status = fileThrottleService.getUploadStatus(principal.getUsername());
+            if (!status.allowed()) {
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                        .body(ApiResponse.error("Upload bandwidth limit exceeded. Please try again later."));
+            }
+            
+            FileRecordResponse response = fileService.uploadSimple(file, logicalId, principal.getId(), 
+                    principal.getUsername(), principal.getRole());
+            return ResponseEntity.ok(ApiResponse.success("File uploaded", response));
+        } finally {
+            fileThrottleService.releaseUploadSlot(principal.getUsername());
+        }
     }
 
     @GetMapping("/{id}")
@@ -106,17 +146,28 @@ public class FileController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(null);
         }
-        FileRecordResponse fileInfo = fileService.getFileInfo(id, principal.getId(), principal.getRole());
-        Resource resource = fileService.loadFileAsResource(id, principal.getId(), principal.getRole());
         
-        String contentType = determineContentType(fileInfo.getMimeType(), fileInfo.getFileType());
-        String contentDisposition = determineContentDisposition(contentType, fileInfo.getOriginalName());
+        if (!fileThrottleService.tryAcquireDownloadSlot(principal.getUsername())) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
+        }
+        
+        try {
+            FileRecordResponse fileInfo = fileService.getFileInfo(id, principal.getId(), principal.getRole());
+            Resource resource = fileService.loadFileAsResource(id, principal.getId(), principal.getRole());
+            
+            fileThrottleService.recordBytesDownloaded(principal.getUsername(), fileInfo.getSize());
+            
+            String contentType = determineContentType(fileInfo.getMimeType(), fileInfo.getFileType());
+            String contentDisposition = determineContentDisposition(contentType, fileInfo.getOriginalName());
 
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(contentType))
-                .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition)
-                .header(HttpHeaders.CONTENT_LENGTH, String.valueOf(fileInfo.getSize()))
-                .body(resource);
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(contentType))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition)
+                    .header(HttpHeaders.CONTENT_LENGTH, String.valueOf(fileInfo.getSize()))
+                    .body(resource);
+        } finally {
+            fileThrottleService.releaseDownloadSlot(principal.getUsername());
+        }
     }
 
     @GetMapping("/{id}/download")
@@ -126,15 +177,26 @@ public class FileController {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        FileRecordResponse fileInfo = fileService.getFileInfo(id, principal.getId(), principal.getRole());
-        Resource resource = fileService.loadFileAsResource(id, principal.getId(), principal.getRole());
+        
+        if (!fileThrottleService.tryAcquireDownloadSlot(principal.getUsername())) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
+        }
+        
+        try {
+            FileRecordResponse fileInfo = fileService.getFileInfo(id, principal.getId(), principal.getRole());
+            Resource resource = fileService.loadFileAsResource(id, principal.getId(), principal.getRole());
 
-        return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION, 
-                        "attachment; filename=\"" + fileInfo.getOriginalName() + "\"")
-                .header(HttpHeaders.CONTENT_LENGTH, String.valueOf(fileInfo.getSize()))
-                .body(resource);
+            fileThrottleService.recordBytesDownloaded(principal.getUsername(), fileInfo.getSize());
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, 
+                            "attachment; filename=\"" + fileInfo.getOriginalName() + "\"")
+                    .header(HttpHeaders.CONTENT_LENGTH, String.valueOf(fileInfo.getSize()))
+                    .body(resource);
+        } finally {
+            fileThrottleService.releaseDownloadSlot(principal.getUsername());
+        }
     }
 
     @GetMapping("/logical/{logicalId}/versions")
@@ -217,6 +279,25 @@ public class FileController {
         fileService.permanentlyDeleteFile(id, principal.getId(), principal.getUsername(), 
                 principal.getRole(), secondaryPassword);
         return ResponseEntity.ok(ApiResponse.success("File permanently deleted", null));
+    }
+
+    @GetMapping("/throttle/status")
+    public ResponseEntity<ApiResponse<ThrottleStatusResponse>> getThrottleStatus(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Authentication required"));
+        }
+        
+        FileThrottleService.ThrottleStatus uploadStatus = fileThrottleService.getUploadStatus(principal.getUsername());
+        FileThrottleService.ThrottleStatus downloadStatus = fileThrottleService.getDownloadStatus(principal.getUsername());
+        
+        ThrottleStatusResponse response = new ThrottleStatusResponse(
+                uploadStatus.allowed(), uploadStatus.usedBytes(), uploadStatus.limitBytes(), uploadStatus.remainingBytes(),
+                downloadStatus.allowed(), downloadStatus.usedBytes(), downloadStatus.limitBytes(), downloadStatus.remainingBytes()
+        );
+        
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     private String determineContentType(String mimeType, String fileType) {

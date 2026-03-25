@@ -31,6 +31,9 @@ security:
     expiration: 86400000
   encryption:
     key: "test-encryption-key-for-unit-tests"
+  field-encryption:
+    enabled: false
+    key: "test-encryption-key-for-unit-tests"
   fail-on-missing-secrets: false
 
 file:

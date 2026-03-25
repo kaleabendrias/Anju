@@ -1,13 +1,11 @@
 package com.anju.service;
 
 import com.anju.dto.FileRecordResponse;
-import com.anju.dto.InitUploadRequest;
 import com.anju.entity.FileRecord;
 import com.anju.entity.User;
 import com.anju.exception.BusinessException;
 import com.anju.exception.ForbiddenException;
 import com.anju.repository.FileRecordRepository;
-import com.anju.security.SecureDataMasker;
 import com.anju.security.SecondaryVerificationService;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -205,7 +203,6 @@ class FileCriticalPathTest {
 
     @Nested
     @DisplayName("Permanent Delete Tests")
-    @Disabled("Test requires proper secondary password setup")
     class PermanentDeleteTests {
 
         @Test
@@ -380,7 +377,6 @@ class FileCriticalPathTest {
 
     @Nested
     @DisplayName("Concurrency Tests")
-    @Disabled("Concurrency test timing issues")
     class ConcurrencyTests {
 
         @Test
@@ -431,7 +427,6 @@ class FileCriticalPathTest {
 
     @Nested
     @DisplayName("Access Control Tests")
-    @Disabled("Test requires proper authentication setup")
     class AccessControlTests {
 
         @Test

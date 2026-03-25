@@ -17,7 +17,9 @@ import java.time.LocalDateTime;
     @Index(name = "idx_appointment_time", columnList = "start_time, end_time"),
     @Index(name = "idx_medical_staff", columnList = "accompanying_staff_id"),
     @Index(name = "idx_resource", columnList = "resource_id"),
-    @Index(name = "idx_service_type", columnList = "service_type")
+    @Index(name = "idx_service_type", columnList = "service_type"),
+    @Index(name = "idx_unique_appointment_number", columnList = "unique_appointment_number"),
+    @Index(name = "idx_idempotency_key", columnList = "idempotency_key")
 })
 @Data
 @Builder
@@ -28,6 +30,12 @@ public class Appointment {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "unique_appointment_number", length = 20, unique = true)
+    private String uniqueAppointmentNumber;
+
+    @Column(name = "idempotency_key", length = 64, unique = true)
+    private String idempotencyKey;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "service_type", nullable = false, length = 30)

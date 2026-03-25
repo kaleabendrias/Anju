@@ -24,6 +24,9 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -427,5 +430,129 @@ class AppointmentServiceTest {
                 .operatorId(1L)
                 .rescheduleCount(0)
                 .build();
+    }
+
+    @Nested
+    @DisplayName("Concurrency Tests")
+    class ConcurrencyTests {
+
+        @Test
+        @DisplayName("Should block simultaneous booking attempts for same resource")
+        void shouldBlockSimultaneousBookingForSameResource() throws InterruptedException {
+            LocalDateTime startTime = LocalDateTime.now().plusDays(1).withHour(10).withMinute(0);
+            LocalDateTime endTime = startTime.plusMinutes(30);
+
+            AppointmentCreateRequest request = AppointmentCreateRequest.builder()
+                    .serviceType(ServiceType.STANDARD_CONSULTATION)
+                    .patientName("Concurrent Patient")
+                    .startTime(startTime)
+                    .endTime(endTime)
+                    .resourceId(100L)
+                    .accompanyingStaffId(1L)
+                    .orderAmount(new BigDecimal("100.00"))
+                    .build();
+
+            when(appointmentRepository.findConflictingStaffAppointments(any(), any(), any()))
+                    .thenReturn(List.of());
+            when(appointmentRepository.findConflictingResourceAppointments(any(), any(), any()))
+                    .thenReturn(List.of());
+            when(appointmentRepository.save(any(Appointment.class))).thenAnswer(invocation -> {
+                Appointment apt = invocation.getArgument(0);
+                apt.setId(1L);
+                return apt;
+            });
+
+            int threadCount = 5;
+            ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+            CountDownLatch latch = new CountDownLatch(threadCount);
+            AtomicInteger successCount = new AtomicInteger(0);
+            AtomicInteger conflictCount = new AtomicInteger(0);
+
+            for (int i = 0; i < threadCount; i++) {
+                final int threadId = i;
+                executor.submit(() -> {
+                    try {
+                        AppointmentCreateRequest threadRequest = AppointmentCreateRequest.builder()
+                                .serviceType(ServiceType.STANDARD_CONSULTATION)
+                                .patientName("Concurrent Patient " + threadId)
+                                .startTime(startTime.plusMinutes(threadId * 5))
+                                .endTime(startTime.plusMinutes(threadId * 5 + 30))
+                                .resourceId(100L)
+                                .accompanyingStaffId(1L)
+                                .orderAmount(new BigDecimal("100.00"))
+                                .idempotencyKey("idem_" + UUID.randomUUID())
+                                .build();
+
+                        appointmentService.createAppointment(threadRequest, 1L, "ADMIN");
+                        successCount.incrementAndGet();
+                    } catch (BusinessException e) {
+                        if (e.getMessage().contains("conflicting")) {
+                            conflictCount.incrementAndGet();
+                        }
+                    } finally {
+                        latch.countDown();
+                    }
+                });
+            }
+
+            latch.await(10, TimeUnit.SECONDS);
+            executor.shutdown();
+
+            assertEquals(1, successCount.get() + conflictCount.get());
+        }
+
+        @Test
+        @DisplayName("Should handle idempotent concurrent appointment creation")
+        void shouldHandleIdempotentConcurrentCreation() throws InterruptedException {
+            LocalDateTime startTime = LocalDateTime.now().plusDays(2).withHour(10).withMinute(0);
+            LocalDateTime endTime = startTime.plusMinutes(30);
+            String idempotencyKey = "concurrent_idem_" + UUID.randomUUID();
+
+            AppointmentCreateRequest request = AppointmentCreateRequest.builder()
+                    .serviceType(ServiceType.STANDARD_CONSULTATION)
+                    .patientName("Idempotent Patient")
+                    .startTime(startTime)
+                    .endTime(endTime)
+                    .resourceId(200L)
+                    .accompanyingStaffId(1L)
+                    .orderAmount(new BigDecimal("100.00"))
+                    .idempotencyKey(idempotencyKey)
+                    .build();
+
+            when(appointmentRepository.findByIdempotencyKey(idempotencyKey))
+                    .thenReturn(Optional.empty());
+            when(appointmentRepository.findConflictingStaffAppointments(any(), any(), any()))
+                    .thenReturn(List.of());
+            when(appointmentRepository.findConflictingResourceAppointments(any(), any(), any()))
+                    .thenReturn(List.of());
+            when(appointmentRepository.save(any(Appointment.class))).thenAnswer(invocation -> {
+                Appointment apt = invocation.getArgument(0);
+                apt.setId(1L);
+                return apt;
+            });
+
+            int threadCount = 10;
+            ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+            CountDownLatch latch = new CountDownLatch(threadCount);
+            AtomicInteger successCount = new AtomicInteger(0);
+
+            for (int i = 0; i < threadCount; i++) {
+                executor.submit(() -> {
+                    try {
+                        appointmentService.createAppointment(request, 1L, "ADMIN");
+                        successCount.incrementAndGet();
+                    } catch (Exception e) {
+                    } finally {
+                        latch.countDown();
+                    }
+                });
+            }
+
+            latch.await(10, TimeUnit.SECONDS);
+            executor.shutdown();
+
+            assertEquals(1, successCount.get());
+            verify(appointmentRepository, times(1)).save(any(Appointment.class));
+        }
     }
 }

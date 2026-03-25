@@ -182,7 +182,7 @@ class SecurityIntegrationTest_v2 {
             String tokenWithRole = jwtTokenProvider.generateToken(frontlineUser.getUsername(), "FRONTLINE");
             mockMvc.perform(get("/api/admin/appointments")
                             .header("Authorization", "Bearer " + tokenWithRole))
-                    .andExpect(status().isCreated());
+                    .andExpect(status().isOk());
         }
 
         @Test
@@ -257,6 +257,7 @@ class SecurityIntegrationTest_v2 {
         @DisplayName("DISPATCHER should confirm appointments")
         void dispatcherConfirmsAppointments() throws Exception {
             Appointment appointment = appointmentRepository.save(Appointment.builder()
+                    .serviceType(Appointment.ServiceType.STANDARD_CONSULTATION)
                     .status(Appointment.AppointmentStatus.PENDING)
                     .startTime(LocalDateTime.now().plusDays(1))
                     .endTime(LocalDateTime.now().plusDays(1).plusHours(1))
@@ -274,6 +275,7 @@ class SecurityIntegrationTest_v2 {
         @DisplayName("FRONTLINE should NOT confirm appointments")
         void frontlineCannotConfirmAppointments() throws Exception {
             Appointment appointment = appointmentRepository.save(Appointment.builder()
+                    .serviceType(Appointment.ServiceType.STANDARD_CONSULTATION)
                     .status(Appointment.AppointmentStatus.PENDING)
                     .startTime(LocalDateTime.now().plusDays(1))
                     .endTime(LocalDateTime.now().plusDays(1).plusHours(1))
@@ -296,6 +298,7 @@ class SecurityIntegrationTest_v2 {
         @DisplayName("User should NOT view another user's appointment")
         void userCannotViewOthersAppointment() throws Exception {
             Appointment othersAppointment = appointmentRepository.save(Appointment.builder()
+                    .serviceType(Appointment.ServiceType.STANDARD_CONSULTATION)
                     .status(Appointment.AppointmentStatus.PENDING)
                     .startTime(LocalDateTime.now().plusDays(1))
                     .endTime(LocalDateTime.now().plusDays(1).plusHours(1))
@@ -313,6 +316,7 @@ class SecurityIntegrationTest_v2 {
         @DisplayName("User should NOT cancel another user's appointment")
         void userCannotCancelOthersAppointment() throws Exception {
             Appointment othersAppointment = appointmentRepository.save(Appointment.builder()
+                    .serviceType(Appointment.ServiceType.STANDARD_CONSULTATION)
                     .status(Appointment.AppointmentStatus.PENDING)
                     .startTime(LocalDateTime.now().plusDays(1))
                     .endTime(LocalDateTime.now().plusDays(1).plusHours(1))
@@ -330,6 +334,7 @@ class SecurityIntegrationTest_v2 {
         @DisplayName("User should view their own appointment")
         void userCanViewOwnAppointment() throws Exception {
             Appointment ownAppointment = appointmentRepository.save(Appointment.builder()
+                    .serviceType(Appointment.ServiceType.STANDARD_CONSULTATION)
                     .status(Appointment.AppointmentStatus.PENDING)
                     .startTime(LocalDateTime.now().plusDays(1))
                     .endTime(LocalDateTime.now().plusDays(1).plusHours(1))
@@ -347,6 +352,7 @@ class SecurityIntegrationTest_v2 {
         @DisplayName("User should cancel their own appointment")
         void userCanCancelOwnAppointment() throws Exception {
             Appointment ownAppointment = appointmentRepository.save(Appointment.builder()
+                    .serviceType(Appointment.ServiceType.STANDARD_CONSULTATION)
                     .status(Appointment.AppointmentStatus.PENDING)
                     .startTime(LocalDateTime.now().plusDays(1))
                     .endTime(LocalDateTime.now().plusDays(1).plusHours(1))
@@ -364,6 +370,7 @@ class SecurityIntegrationTest_v2 {
         @DisplayName("ADMIN should view any appointment")
         void adminCanViewAnyAppointment() throws Exception {
             Appointment appointment = appointmentRepository.save(Appointment.builder()
+                    .serviceType(Appointment.ServiceType.STANDARD_CONSULTATION)
                     .status(Appointment.AppointmentStatus.PENDING)
                     .startTime(LocalDateTime.now().plusDays(1))
                     .endTime(LocalDateTime.now().plusDays(1).plusHours(1))
@@ -381,6 +388,7 @@ class SecurityIntegrationTest_v2 {
         @DisplayName("ADMIN should cancel any appointment")
         void adminCanCancelAnyAppointment() throws Exception {
             Appointment appointment = appointmentRepository.save(Appointment.builder()
+                    .serviceType(Appointment.ServiceType.STANDARD_CONSULTATION)
                     .status(Appointment.AppointmentStatus.PENDING)
                     .startTime(LocalDateTime.now().plusDays(1))
                     .endTime(LocalDateTime.now().plusDays(1).plusHours(1))

@@ -116,7 +116,6 @@ class FinanceCriticalPathTest {
         @Test
         @Order(3)
         @DisplayName("Should prevent duplicate refund with same idempotency key")
-        @Disabled("Test requires proper refund idempotency setup")
         void preventDuplicateRefundWithSameIdempotencyKey() {
             Transaction original = transactionRepository.save(Transaction.builder()
                     .trxId("TRX_ORIGINAL_" + UUID.randomUUID())
@@ -154,7 +153,6 @@ class FinanceCriticalPathTest {
 
     @Nested
     @DisplayName("Refund Validation Tests")
-    @Disabled("Test requires proper transaction setup")
     class RefundValidationTests {
 
         @Test
@@ -303,7 +301,6 @@ class FinanceCriticalPathTest {
 
     @Nested
     @DisplayName("Transaction Rollback Tests")
-    @Disabled("Test requires proper transaction setup")
     class TransactionRollbackTests {
 
         @Test

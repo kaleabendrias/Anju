@@ -6,6 +6,10 @@ import com.anju.security.UserPrincipal;
 import com.anju.service.AppointmentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -19,6 +23,30 @@ import java.util.List;
 public class AppointmentController {
 
     private final AppointmentService appointmentService;
+
+    @GetMapping("/api/admin/appointments")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FRONTLINE', 'DISPATCHER')")
+    public ResponseEntity<ApiResponse<Page<AppointmentResponse>>> getAdminAppointments(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam(required = false) AppointmentStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Authentication required"));
+        }
+        Sort sort = sortDir.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
+        Pageable pageable = PageRequest.of(page, size, sort);
+        Page<AppointmentResponse> appointments;
+        if (status != null) {
+            appointments = appointmentService.getAppointmentsByStatus(status, pageable);
+        } else {
+            appointments = appointmentService.getAllAppointments(principal.getId(), principal.getRole(), pageable);
+        }
+        return ResponseEntity.ok(ApiResponse.success(appointments));
+    }
 
     @PostMapping("/api/admin/appointments")
     @PreAuthorize("hasAnyRole('ADMIN', 'FRONTLINE')")
@@ -48,18 +76,24 @@ public class AppointmentController {
     }
 
     @GetMapping("/api/appointments")
-    public ResponseEntity<ApiResponse<List<AppointmentResponse>>> getAllAppointments(
+    public ResponseEntity<ApiResponse<Page<AppointmentResponse>>> getAllAppointments(
             @AuthenticationPrincipal UserPrincipal principal,
-            @RequestParam(required = false) AppointmentStatus status) {
+            @RequestParam(required = false) AppointmentStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(ApiResponse.error("Authentication required"));
         }
-        List<AppointmentResponse> appointments;
+        Sort sort = sortDir.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
+        Pageable pageable = PageRequest.of(page, size, sort);
+        Page<AppointmentResponse> appointments;
         if (status != null) {
-            appointments = appointmentService.getAppointmentsByStatus(status);
+            appointments = appointmentService.getAppointmentsByStatus(status, pageable);
         } else {
-            appointments = appointmentService.getAllAppointments(principal.getId(), principal.getRole());
+            appointments = appointmentService.getAllAppointments(principal.getId(), principal.getRole(), pageable);
         }
         return ResponseEntity.ok(ApiResponse.success(appointments));
     }

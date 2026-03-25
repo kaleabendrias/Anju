@@ -40,6 +40,8 @@ public class AppointmentCreateRequest {
     private String patientName;
     
     private String notes;
+    
+    private String idempotencyKey;
 
     private static final Set<Integer> STANDARD_DURATIONS = Set.of(15, 30, 60, 90);
 

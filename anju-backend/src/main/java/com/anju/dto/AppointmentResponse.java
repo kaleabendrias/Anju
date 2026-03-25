@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class AppointmentResponse {
     private Long id;
+    private String uniqueAppointmentNumber;
     private ServiceType serviceType;
     private BigDecimal orderAmount;
     private AppointmentStatus status;
@@ -37,6 +38,7 @@ public class AppointmentResponse {
     public static AppointmentResponse fromEntity(Appointment appointment) {
         return AppointmentResponse.builder()
                 .id(appointment.getId())
+                .uniqueAppointmentNumber(appointment.getUniqueAppointmentNumber())
                 .serviceType(appointment.getServiceType())
                 .orderAmount(appointment.getOrderAmount())
                 .status(appointment.getStatus())
