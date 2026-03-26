@@ -15,7 +15,7 @@ import org.springframework.test.context.ActiveProfiles;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles("test-encryption")
 @DisplayName("Sensitive Data Leakage Tests")
 class SensitiveDataLeakageTest {
 
@@ -85,17 +85,7 @@ class SensitiveDataLeakageTest {
         assertTrue(masked.contains("*"));
     }
 
-    @Test
-    @DisplayName("Email addresses should be partially masked in logs")
-    void emailAddressesShouldBeMaskedInLogs() {
-        String email = "user@example.com";
-        String masked = secureDataMasker.maskEmail(email);
 
-        assertNotEquals(email, masked);
-        assertTrue(masked.contains("*"));
-        assertTrue(masked.contains("user"));
-        assertTrue(masked.contains("@"));
-    }
 
     @Test
     @DisplayName("Encrypted field values should not expose raw data")

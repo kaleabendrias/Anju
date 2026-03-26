@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS properties (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     unique_code VARCHAR(50) NOT NULL UNIQUE,
+    owner_id BIGINT,
     status VARCHAR(20) NOT NULL DEFAULT 'DRAFT',
     rent DECIMAL(12, 2) NOT NULL,
     deposit DECIMAL(12, 2) NOT NULL,
@@ -23,7 +24,8 @@ CREATE TABLE IF NOT EXISTS properties (
     materials_json TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_unique_code (unique_code)
+    INDEX idx_unique_code (unique_code),
+    INDEX idx_property_owner (owner_id)
 );
 
 CREATE TABLE IF NOT EXISTS appointments (
@@ -145,8 +147,8 @@ SELECT 'reviewer', '$2a$10$5S.ULcxVQtees4reLvbYnOKRkLhDAIJgKyfFqqL1a9lrVqFKjJhpS
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'reviewer');
 
 INSERT INTO users (username, password_hash, role)
-SELECT 'dispatch', '$2a$10$5S.ULcxVQtees4reLvbYnOKRkLhDAIJgKyfFqqL1a9lrVqFKjJhpS', 'DISPATCHER'
-WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'dispatch');
+SELECT 'dispatcher', '$2a$10$5S.ULcxVQtees4reLvbYnOKRkLhDAIJgKyfFqqL1a9lrVqFKjJhpS', 'DISPATCHER'
+WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'dispatcher');
 
 INSERT INTO users (username, password_hash, role)
 SELECT 'finance', '$2a$10$5S.ULcxVQtees4reLvbYnOKRkLhDAIJgKyfFqqL1a9lrVqFKjJhpS', 'FINANCE'

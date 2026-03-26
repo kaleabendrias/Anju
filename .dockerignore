@@ -1,0 +1,12 @@
+.git
+.gitignore
+.idea
+.vscode
+**/target
+**/.DS_Store
+**/*.log
+node_modules
+storage
+test-storage
+mysql-data
+tool-output

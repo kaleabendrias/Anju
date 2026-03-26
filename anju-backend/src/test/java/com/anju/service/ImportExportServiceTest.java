@@ -17,6 +17,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ImportExportServiceTest {
@@ -217,6 +221,46 @@ class ImportExportServiceTest {
             String csv = importExportService.exportAppointmentsToCsv(appointments);
 
             assertTrue(csv.contains("\"Doe, John\""));
+        }
+    }
+
+    @Nested
+    @DisplayName("Idempotency Tests")
+    class IdempotencyTests {
+
+        @Test
+        @DisplayName("Should return cached import result for duplicate request")
+        void shouldReturnCachedImportResultForDuplicate() {
+            String csv = "service_type,start_time,end_time,patient_name\n" +
+                    "STANDARD_CONSULTATION,2026-04-01 10:00:00,2026-04-01 10:30:00,John Doe\n";
+            MockMultipartFile file = new MockMultipartFile(
+                    "file", "appointments.csv", "text/csv", csv.getBytes());
+
+            ImportExportService.ImportResult cached = new ImportExportService.ImportResult(1, 0, 0, "cached", false);
+            when(idempotencyService.isDuplicate("same-key", "APPOINTMENT_IMPORT")).thenReturn(true);
+            when(idempotencyService.getCachedResult("same-key", "APPOINTMENT_IMPORT", ImportExportService.ImportResult.class))
+                    .thenReturn(cached);
+
+            ImportExportService.ImportResult result = importExportService.importAppointmentsCsv(file, "same-key", 1L);
+
+            assertTrue(result.isFromCache());
+            assertEquals(1, result.getSuccessCount());
+        }
+
+        @Test
+        @DisplayName("Should persist import result via idempotency service")
+        void shouldPersistImportResultViaIdempotencyService() {
+            String csv = "service_type,start_time,end_time,patient_name\n" +
+                    "STANDARD_CONSULTATION,2026-04-01 10:00:00,2026-04-01 10:30:00,John Doe\n";
+            MockMultipartFile file = new MockMultipartFile(
+                    "file", "appointments.csv", "text/csv", csv.getBytes());
+
+            when(idempotencyService.isDuplicate(any(), eq("APPOINTMENT_IMPORT"))).thenReturn(false);
+            when(idempotencyService.isDuplicate(any(), eq("APPOINTMENT_IMPORT_RECORD"))).thenReturn(false);
+
+            importExportService.importAppointmentsCsv(file, "persist-key", 1L);
+
+            verify(idempotencyService).recordOperation(eq("persist-key"), eq("APPOINTMENT_IMPORT"), any());
         }
     }
 

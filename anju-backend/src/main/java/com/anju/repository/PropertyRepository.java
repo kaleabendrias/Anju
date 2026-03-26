@@ -13,4 +13,6 @@ public interface PropertyRepository extends JpaRepository<Property, Long> {
     Optional<Property> findByUniqueCode(String uniqueCode);
     boolean existsByUniqueCode(String uniqueCode);
     List<Property> findByStatus(PropertyStatus status);
+    List<Property> findByOwnerId(Long ownerId);
+    List<Property> findByStatusAndOwnerId(PropertyStatus status, Long ownerId);
 }

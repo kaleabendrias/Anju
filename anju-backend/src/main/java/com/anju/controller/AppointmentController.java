@@ -41,7 +41,7 @@ public class AppointmentController {
         Pageable pageable = PageRequest.of(page, size, sort);
         Page<AppointmentResponse> appointments;
         if (status != null) {
-            appointments = appointmentService.getAppointmentsByStatus(status, pageable);
+            appointments = appointmentService.getAppointmentsByStatus(status, principal.getId(), principal.getRole(), pageable);
         } else {
             appointments = appointmentService.getAllAppointments(principal.getId(), principal.getRole(), pageable);
         }
@@ -91,7 +91,7 @@ public class AppointmentController {
         Pageable pageable = PageRequest.of(page, size, sort);
         Page<AppointmentResponse> appointments;
         if (status != null) {
-            appointments = appointmentService.getAppointmentsByStatus(status, pageable);
+            appointments = appointmentService.getAppointmentsByStatus(status, principal.getId(), principal.getRole(), pageable);
         } else {
             appointments = appointmentService.getAllAppointments(principal.getId(), principal.getRole(), pageable);
         }

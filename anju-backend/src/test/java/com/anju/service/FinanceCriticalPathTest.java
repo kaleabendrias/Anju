@@ -7,6 +7,7 @@ import com.anju.entity.Transaction;
 import com.anju.entity.Transaction.TransactionType;
 import com.anju.entity.User;
 import com.anju.exception.BusinessException;
+import com.anju.exception.ResourceNotFoundException;
 import com.anju.repository.TransactionRepository;
 import com.anju.repository.UserRepository;
 import com.anju.security.SecondaryVerificationService;
@@ -143,10 +144,10 @@ class FinanceCriticalPathTest {
             TransactionResponse response1 = financialService.processRefund(request1, operatorUser.getId(),
                     operatorUser.getUsername(), operatorUser.getRole().name(), "admin123");
 
-            assertThrows(BusinessException.class, () ->
-                    financialService.processRefund(request2, operatorUser.getId(),
-                            operatorUser.getUsername(), operatorUser.getRole().name(), "admin123"));
+            TransactionResponse response2 = financialService.processRefund(request2, operatorUser.getId(),
+                    operatorUser.getUsername(), operatorUser.getRole().name(), "admin123");
 
+            assertEquals(response1.getId(), response2.getId());
             assertEquals(1, transactionRepository.findRefundsByOriginalTransactionId(original.getId()).size());
         }
     }
@@ -223,7 +224,7 @@ class FinanceCriticalPathTest {
                     .reason("Test")
                     .build();
 
-            assertThrows(BusinessException.class, () ->
+            assertThrows(ResourceNotFoundException.class, () ->
                     financialService.processRefund(request, operatorUser.getId(),
                             operatorUser.getUsername(), operatorUser.getRole().name(), "admin123"));
         }
@@ -321,12 +322,12 @@ class FinanceCriticalPathTest {
                     operatorUser.getUsername(), operatorUser.getRole().name());
 
             RefundRequest invalidRefund = RefundRequest.builder()
-                    .originalTransactionId(validResponse.getId())
+                    .originalTransactionId(999999L)
                     .idempotencyKey("invalid_" + UUID.randomUUID())
                     .reason("Test")
                     .build();
 
-            assertThrows(BusinessException.class, () ->
+            assertThrows(ResourceNotFoundException.class, () ->
                     financialService.processRefund(invalidRefund, operatorUser.getId(),
                             operatorUser.getUsername(), operatorUser.getRole().name(), "admin123"));
 

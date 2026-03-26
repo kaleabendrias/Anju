@@ -1,13 +1,17 @@
 package com.anju.service;
 
+import com.anju.entity.IdempotencyEntry;
+import com.anju.repository.IdempotencyEntryRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
-import java.time.Instant;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.time.LocalDateTime;
+import java.util.Optional;
 
 @Service
 public class IdempotencyService {
@@ -16,22 +20,29 @@ public class IdempotencyService {
     private static final Duration DEFAULT_TTL = Duration.ofHours(24);
     private static final Duration APPOINTMENT_TTL = Duration.ofDays(7);
 
-    private final Map<String, IdempotencyRecord> records = new ConcurrentHashMap<>();
+    private final IdempotencyEntryRepository idempotencyEntryRepository;
+    private final ObjectMapper objectMapper;
 
+    public IdempotencyService(IdempotencyEntryRepository idempotencyEntryRepository, ObjectMapper objectMapper) {
+        this.idempotencyEntryRepository = idempotencyEntryRepository;
+        this.objectMapper = objectMapper;
+    }
+
+    @Transactional(readOnly = true)
     public boolean isDuplicate(String idempotencyKey, String operation) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             return false;
         }
 
-        String fullKey = operation + ":" + idempotencyKey;
-        IdempotencyRecord record = records.get(fullKey);
+        Optional<IdempotencyEntry> entryOpt = idempotencyEntryRepository
+                .findByOperationAndIdempotencyKey(operation, idempotencyKey);
 
-        if (record == null) {
+        if (entryOpt.isEmpty()) {
             return false;
         }
 
-        if (record.isExpired()) {
-            records.remove(fullKey);
+        IdempotencyEntry entry = entryOpt.get();
+        if (entry.getExpiresAt().isBefore(LocalDateTime.now())) {
             return false;
         }
 
@@ -39,55 +50,96 @@ public class IdempotencyService {
         return true;
     }
 
+    @Transactional
     public void recordOperation(String idempotencyKey, String operation, Object result) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             return;
         }
 
         Duration ttl = "APPOINTMENT".equals(operation) ? APPOINTMENT_TTL : DEFAULT_TTL;
-        String fullKey = operation + ":" + idempotencyKey;
-        records.put(fullKey, new IdempotencyRecord(result, Instant.now().plus(ttl)));
-        
+        LocalDateTime expiresAt = LocalDateTime.now().plus(ttl);
+
+        IdempotencyEntry entry = idempotencyEntryRepository
+                .findByOperationAndIdempotencyKey(operation, idempotencyKey)
+                .orElseGet(IdempotencyEntry::new);
+
+        entry.setOperation(operation);
+        entry.setIdempotencyKey(idempotencyKey);
+        entry.setExpiresAt(expiresAt);
+        entry.setResultType(result != null ? result.getClass().getName() : null);
+        entry.setResultPayload(serializeResult(result));
+
+        idempotencyEntryRepository.save(entry);
+
         log.debug("Recorded idempotency key: operation={}, key={}, ttl={}", operation, idempotencyKey, ttl);
     }
 
+    @Transactional(readOnly = true)
     public Object getCachedResult(String idempotencyKey, String operation) {
+        return getCachedResult(idempotencyKey, operation, Object.class);
+    }
+
+    @Transactional(readOnly = true)
+    public <T> T getCachedResult(String idempotencyKey, String operation, Class<T> resultType) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             return null;
         }
 
-        String fullKey = operation + ":" + idempotencyKey;
-        IdempotencyRecord record = records.get(fullKey);
-
-        if (record == null || record.isExpired()) {
+        Optional<IdempotencyEntry> entryOpt = idempotencyEntryRepository
+                .findByOperationAndIdempotencyKey(operation, idempotencyKey);
+        if (entryOpt.isEmpty()) {
             return null;
         }
 
-        return record.result();
+        IdempotencyEntry entry = entryOpt.get();
+        if (entry.getExpiresAt().isBefore(LocalDateTime.now())) {
+            return null;
+        }
+
+        if (entry.getResultPayload() == null) {
+            return null;
+        }
+
+        try {
+            return objectMapper.readValue(entry.getResultPayload(), resultType);
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to deserialize idempotency payload for operation={}, key={}", operation, idempotencyKey, e);
+            return null;
+        }
     }
 
+    @Transactional
     public void remove(String idempotencyKey, String operation) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             return;
         }
 
-        String fullKey = operation + ":" + idempotencyKey;
-        records.remove(fullKey);
+        idempotencyEntryRepository.findByOperationAndIdempotencyKey(operation, idempotencyKey)
+                .ifPresent(idempotencyEntryRepository::delete);
     }
 
+    @Transactional
     public void cleanup() {
-        Instant now = Instant.now();
-        records.entrySet().removeIf(e -> e.getValue().isExpired());
+        int removed = idempotencyEntryRepository.deleteExpired(LocalDateTime.now());
+        if (removed > 0) {
+            log.debug("Cleaned up {} expired idempotency entries", removed);
+        }
     }
 
+    @Transactional(readOnly = true)
     public int getActiveCount() {
-        cleanup();
-        return records.size();
+        return Math.toIntExact(idempotencyEntryRepository.countByExpiresAtAfter(LocalDateTime.now()));
     }
 
-    private record IdempotencyRecord(Object result, Instant expiresAt) {
-        boolean isExpired() {
-            return Instant.now().isAfter(expiresAt);
+    private String serializeResult(Object result) {
+        if (result == null) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(result);
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to serialize idempotency result, storing null payload", e);
+            return null;
         }
     }
 }

@@ -8,6 +8,7 @@ import com.anju.exception.BusinessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedReader;
@@ -28,6 +29,8 @@ public class ImportExportService {
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter DATETIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final DateTimeFormatter DATETIME_FORMAT_ALT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
+    private static final String IMPORT_OPERATION = "APPOINTMENT_IMPORT";
+    private static final String IMPORT_RECORD_OPERATION = "APPOINTMENT_IMPORT_RECORD";
 
     private final AppointmentService appointmentService;
     private final IdempotencyService idempotencyService;
@@ -84,6 +87,100 @@ public class ImportExportService {
         }
 
         return new ImportValidationResult(errors, validRecords, lineNumber);
+    }
+
+    @Transactional
+    public ImportResult importAppointmentsCsv(MultipartFile file, String idempotencyKey, Long operatorId) {
+        String effectiveIdempotencyKey = idempotencyKey != null ? idempotencyKey : generateImportIdempotencyKey(file);
+        
+        if (idempotencyService.isDuplicate(effectiveIdempotencyKey, IMPORT_OPERATION)) {
+            log.info("Duplicate import detected: key={}", effectiveIdempotencyKey);
+            ImportResult cached = idempotencyService.getCachedResult(
+                    effectiveIdempotencyKey,
+                    IMPORT_OPERATION,
+                    ImportResult.class);
+            if (cached != null) {
+                cached.setFromCache(true);
+                return cached;
+            }
+            return new ImportResult(0, 0, 0, "Duplicate import request detected", true);
+        }
+
+        ImportValidationResult validation = validateAppointmentsCsv(file);
+        
+        if (!validation.getErrors().isEmpty()) {
+            ImportResult result = new ImportResult(0, 0, validation.getErrors().size(), 
+                    "Validation failed with " + validation.getErrors().size() + " errors", false);
+            result.setValidationErrors(validation.getErrors());
+            return result;
+        }
+
+        int successCount = 0;
+        int skipCount = 0;
+        int errorCount = 0;
+        List<FieldError> errors = new ArrayList<>();
+
+        for (Map<String, String> record : validation.getValidRecords()) {
+            try {
+                String recordIdempotencyKey = buildRecordIdempotencyKey(effectiveIdempotencyKey, record);
+                
+                if (idempotencyService.isDuplicate(recordIdempotencyKey, IMPORT_RECORD_OPERATION)) {
+                    skipCount++;
+                    log.debug("Skipping duplicate record: patient={}", record.get("patient_name"));
+                    continue;
+                }
+
+                Appointment appointment = createAppointmentFromRecord(record, operatorId);
+                appointmentService.createAppointment(appointment, operatorId);
+                
+                idempotencyService.recordOperation(recordIdempotencyKey, IMPORT_RECORD_OPERATION, appointment.getId());
+                successCount++;
+                
+            } catch (Exception e) {
+                errorCount++;
+                String patientName = record.getOrDefault("patient_name", "unknown");
+                errors.add(new FieldError(0, "import", "Failed to import record for patient '" + patientName + "': " + e.getMessage()));
+                log.error("Import failed for patient: {}", patientName, e);
+            }
+        }
+
+        ImportResult result = new ImportResult(successCount, skipCount, errorCount, 
+                String.format("Import completed: %d success, %d skipped (duplicates), %d errors", 
+                        successCount, skipCount, errorCount), false);
+        result.setValidationErrors(errors);
+        
+        idempotencyService.recordOperation(effectiveIdempotencyKey, IMPORT_OPERATION, result);
+        
+        log.info("Import completed: key={}, success={}, skipped={}, errors={}", 
+                effectiveIdempotencyKey, successCount, skipCount, errorCount);
+        
+        return result;
+    }
+
+    private String generateImportIdempotencyKey(MultipartFile file) {
+        return "import_" + file.getOriginalFilename() + "_" + file.getSize() + "_" + 
+               file.getContentType().hashCode();
+    }
+
+    private String buildRecordIdempotencyKey(String importKey, Map<String, String> record) {
+        String patientName = record.getOrDefault("patient_name", "");
+        String startTime = record.getOrDefault("start_time", "");
+        String serviceType = record.getOrDefault("service_type", "");
+        return importKey + "_" + patientName + "_" + startTime + "_" + serviceType;
+    }
+
+    public ImportResult getImportResult(String idempotencyKey) {
+        if (idempotencyKey == null) {
+            return null;
+        }
+        
+        ImportResult cached = idempotencyService.getCachedResult(idempotencyKey, IMPORT_OPERATION, ImportResult.class);
+        if (cached != null) {
+            cached.setFromCache(true);
+            return cached;
+        }
+
+        return null;
     }
 
     private void validateRequiredHeaders(Map<String, Integer> headerIndex, List<FieldError> errors) {
@@ -170,6 +267,35 @@ public class ImportExportService {
         return errors;
     }
 
+    private Appointment createAppointmentFromRecord(Map<String, String> record, Long operatorId) {
+        Appointment appointment = new Appointment();
+        appointment.setServiceType(ServiceType.valueOf(record.get("service_type").toUpperCase().trim()));
+        appointment.setStartTime(parseDateTime(record.get("start_time")));
+        appointment.setEndTime(parseDateTime(record.get("end_time")));
+        appointment.setPatientName(record.get("patient_name"));
+        
+        if (record.containsKey("order_amount") && !record.get("order_amount").isBlank()) {
+            appointment.setOrderAmount(new BigDecimal(record.get("order_amount")));
+        }
+        
+        if (record.containsKey("notes") && !record.get("notes").isBlank()) {
+            appointment.setNotes(record.get("notes"));
+        }
+        
+        if (record.containsKey("accompanying_staff_id") && !record.get("accompanying_staff_id").isBlank()) {
+            appointment.setAccompanyingStaffId(Long.parseLong(record.get("accompanying_staff_id")));
+        }
+        
+        if (record.containsKey("resource_id") && !record.get("resource_id").isBlank()) {
+            appointment.setResourceId(Long.parseLong(record.get("resource_id")));
+        }
+        
+        appointment.setOperatorId(operatorId);
+        appointment.setIdempotencyKey(UUID.randomUUID().toString());
+        
+        return appointment;
+    }
+
     private LocalDateTime parseDateTime(String dateTimeStr) throws DateTimeParseException {
         try {
             return LocalDateTime.parse(dateTimeStr.trim(), DATETIME_FORMAT_ALT);
@@ -239,5 +365,38 @@ public class ImportExportService {
             return "\"" + field.replace("\"", "\"\"") + "\"";
         }
         return field;
+    }
+
+    public static class ImportResult {
+        private int successCount;
+        private int skipCount;
+        private int errorCount;
+        private String message;
+        private boolean fromCache;
+        private List<FieldError> validationErrors;
+
+        public ImportResult() {
+        }
+
+        public ImportResult(int successCount, int skipCount, int errorCount, String message, boolean fromCache) {
+            this.successCount = successCount;
+            this.skipCount = skipCount;
+            this.errorCount = errorCount;
+            this.message = message;
+            this.fromCache = fromCache;
+        }
+
+        public int getSuccessCount() { return successCount; }
+        public void setSuccessCount(int successCount) { this.successCount = successCount; }
+        public int getSkipCount() { return skipCount; }
+        public void setSkipCount(int skipCount) { this.skipCount = skipCount; }
+        public int getErrorCount() { return errorCount; }
+        public void setErrorCount(int errorCount) { this.errorCount = errorCount; }
+        public String getMessage() { return message; }
+        public void setMessage(String message) { this.message = message; }
+        public boolean isFromCache() { return fromCache; }
+        public void setFromCache(boolean fromCache) { this.fromCache = fromCache; }
+        public List<FieldError> getValidationErrors() { return validationErrors; }
+        public void setValidationErrors(List<FieldError> validationErrors) { this.validationErrors = validationErrors; }
     }
 }

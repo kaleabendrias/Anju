@@ -5,10 +5,12 @@ import com.anju.dto.VacancyPeriodResponse;
 import com.anju.dto.VacancyPeriodUpdateRequest;
 import com.anju.entity.Property;
 import com.anju.entity.VacancyPeriod;
+import com.anju.exception.AccessDeniedException;
 import com.anju.exception.BusinessException;
 import com.anju.exception.ResourceNotFoundException;
 import com.anju.repository.PropertyRepository;
 import com.anju.repository.VacancyPeriodRepository;
+import com.anju.security.UserPrincipal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -40,6 +42,7 @@ public class VacancyPeriodService {
         Property property = propertyRepository.findById(request.getPropertyId())
                 .orElseThrow(() -> new ResourceNotFoundException("Property not found: " + request.getPropertyId()));
 
+        validatePropertyAccess(property, operatorId);
         validateDateRange(request.getStartDate(), request.getEndDate(), property.getId());
 
         VacancyPeriod vacancyPeriod = VacancyPeriod.builder()
@@ -72,11 +75,14 @@ public class VacancyPeriodService {
     }
 
     @Transactional
-    public VacancyPeriodResponse updateVacancyPeriod(Long id, VacancyPeriodUpdateRequest request, Long operatorId) {
+    public VacancyPeriodResponse updateVacancyPeriod(Long id, VacancyPeriodUpdateRequest request, UserPrincipal principal) {
         VacancyPeriod vacancyPeriod = vacancyPeriodRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Vacancy period not found: " + id));
 
-        validateDateRange(request.getStartDate(), request.getEndDate(), vacancyPeriod.getProperty().getId());
+        validateVacancyPeriodAccess(vacancyPeriod, principal);
+
+        Property property = vacancyPeriod.getProperty();
+        validateDateRange(request.getStartDate(), request.getEndDate(), property.getId());
 
         String oldValues = String.format("{\"start_date\":\"%s\",\"end_date\":\"%s\",\"reason\":\"%s\",\"is_active\":\"%s\"}",
                 vacancyPeriod.getStartDate(), vacancyPeriod.getEndDate(), vacancyPeriod.getReason(), vacancyPeriod.getIsActive());
@@ -95,52 +101,84 @@ public class VacancyPeriodService {
                 saved.getId(),
                 "VACANCY_PERIOD",
                 AuditLogService.OPERATION_UPDATE,
-                operatorId,
+                principal.getId(),
                 null,
                 oldValues,
                 "Updated vacancy period: " + saved.getId(),
                 null
         );
 
-        log.info("Vacancy period updated: id={}, startDate={}, operator={}", saved.getId(), request.getStartDate(), operatorId);
+        log.info("Vacancy period updated: id={}, startDate={}, operator={}", saved.getId(), request.getStartDate(), principal.getId());
 
         return VacancyPeriodResponse.fromEntity(saved);
     }
 
-    public VacancyPeriodResponse getVacancyPeriodById(Long id) {
+    public VacancyPeriodResponse getVacancyPeriodById(Long id, UserPrincipal principal) {
         VacancyPeriod vacancyPeriod = vacancyPeriodRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Vacancy period not found: " + id));
+
+        validateVacancyPeriodAccess(vacancyPeriod, principal);
         return VacancyPeriodResponse.fromEntity(vacancyPeriod);
     }
 
-    public List<VacancyPeriodResponse> getVacancyPeriodsByProperty(Long propertyId) {
+    public List<VacancyPeriodResponse> getVacancyPeriodsByProperty(Long propertyId, UserPrincipal principal) {
+        Property property = propertyRepository.findById(propertyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Property not found: " + propertyId));
+
+        validatePropertyAccess(property, principal);
+
         List<VacancyPeriod> periods = vacancyPeriodRepository.findByPropertyIdAndIsActiveTrue(propertyId);
         return periods.stream()
                 .map(VacancyPeriodResponse::fromEntity)
                 .collect(Collectors.toList());
     }
 
-    public List<VacancyPeriodResponse> getAllVacancyPeriods() {
-        return vacancyPeriodRepository.findAll().stream()
+    public List<VacancyPeriodResponse> getAllVacancyPeriods(UserPrincipal principal) {
+        List<VacancyPeriod> periods;
+        
+        if (principal.isAdmin()) {
+            periods = vacancyPeriodRepository.findAll();
+            log.debug("Admin fetching all vacancy periods: count={}", periods.size());
+        } else {
+            periods = vacancyPeriodRepository.findByCreatedBy(principal.getId());
+            log.debug("User fetching own vacancy periods: userId={}, count={}", principal.getId(), periods.size());
+        }
+        
+        return periods.stream()
                 .map(VacancyPeriodResponse::fromEntity)
                 .collect(Collectors.toList());
     }
 
-    public List<VacancyPeriodResponse> getActiveVacancyPeriodsForProperty(Long propertyId) {
+    public List<VacancyPeriodResponse> getActiveVacancyPeriodsForProperty(Long propertyId, UserPrincipal principal) {
+        Property property = propertyRepository.findById(propertyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Property not found: " + propertyId));
+
+        validatePropertyAccess(property, principal);
+
         List<VacancyPeriod> periods = vacancyPeriodRepository.findByPropertyIdAndIsActiveTrue(propertyId);
         return periods.stream()
                 .map(VacancyPeriodResponse::fromEntity)
                 .collect(Collectors.toList());
     }
 
-    public List<VacancyPeriodResponse> getCurrentVacancyPeriodsForProperty(Long propertyId, LocalDate date) {
+    public List<VacancyPeriodResponse> getCurrentVacancyPeriodsForProperty(Long propertyId, LocalDate date, UserPrincipal principal) {
+        Property property = propertyRepository.findById(propertyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Property not found: " + propertyId));
+
+        validatePropertyAccess(property, principal);
+
         List<VacancyPeriod> periods = vacancyPeriodRepository.findActiveVacancyForPropertyOnDate(propertyId, date);
         return periods.stream()
                 .map(VacancyPeriodResponse::fromEntity)
                 .collect(Collectors.toList());
     }
 
-    public List<VacancyPeriodResponse> getOverlappingVacancyPeriods(Long propertyId, LocalDate startDate, LocalDate endDate) {
+    public List<VacancyPeriodResponse> getOverlappingVacancyPeriods(Long propertyId, LocalDate startDate, LocalDate endDate, UserPrincipal principal) {
+        Property property = propertyRepository.findById(propertyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Property not found: " + propertyId));
+
+        validatePropertyAccess(property, principal);
+
         List<VacancyPeriod> periods = vacancyPeriodRepository.findOverlappingVacancies(propertyId, startDate, endDate);
         return periods.stream()
                 .map(VacancyPeriodResponse::fromEntity)
@@ -148,9 +186,11 @@ public class VacancyPeriodService {
     }
 
     @Transactional
-    public void deactivateVacancyPeriod(Long id, Long operatorId) {
+    public void deactivateVacancyPeriod(Long id, UserPrincipal principal) {
         VacancyPeriod vacancyPeriod = vacancyPeriodRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Vacancy period not found: " + id));
+
+        validateVacancyPeriodAccess(vacancyPeriod, principal);
 
         vacancyPeriod.setIsActive(false);
         vacancyPeriodRepository.save(vacancyPeriod);
@@ -159,20 +199,22 @@ public class VacancyPeriodService {
                 vacancyPeriod.getId(),
                 "VACANCY_PERIOD",
                 "DEACTIVATE",
-                operatorId,
+                principal.getId(),
                 null,
                 null,
                 "Deactivated vacancy period: " + vacancyPeriod.getId(),
                 null
         );
 
-        log.info("Vacancy period deactivated: id={}, operator={}", id, operatorId);
+        log.info("Vacancy period deactivated: id={}, operator={}", id, principal.getId());
     }
 
     @Transactional
-    public void deleteVacancyPeriod(Long id, Long operatorId) {
+    public void deleteVacancyPeriod(Long id, UserPrincipal principal) {
         VacancyPeriod vacancyPeriod = vacancyPeriodRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Vacancy period not found: " + id));
+
+        validateVacancyPeriodAccess(vacancyPeriod, principal);
 
         vacancyPeriodRepository.delete(vacancyPeriod);
 
@@ -180,7 +222,7 @@ public class VacancyPeriodService {
                 vacancyPeriod.getId(),
                 "VACANCY_PERIOD",
                 AuditLogService.OPERATION_DELETE,
-                operatorId,
+                principal.getId(),
                 null,
                 String.format("{\"property_id\":\"%d\",\"start_date\":\"%s\",\"end_date\":\"%s\"}",
                         vacancyPeriod.getProperty().getId(), vacancyPeriod.getStartDate(), vacancyPeriod.getEndDate()),
@@ -188,7 +230,41 @@ public class VacancyPeriodService {
                 null
         );
 
-        log.info("Vacancy period deleted: id={}, operator={}", id, operatorId);
+        log.info("Vacancy period deleted: id={}, operator={}", id, principal.getId());
+    }
+
+    private void validatePropertyAccess(Property property, UserPrincipal principal) {
+        if (principal == null) {
+            throw new AccessDeniedException("Authentication required");
+        }
+        if (principal.isAdmin()) {
+            return;
+        }
+        if (property.getOwnerId() == null || !property.getOwnerId().equals(principal.getId())) {
+            throw new AccessDeniedException("You do not have permission to access this property's vacancy periods");
+        }
+    }
+
+    private void validatePropertyAccess(Property property, Long userId) {
+        if (userId == null) {
+            throw new AccessDeniedException("Authentication required");
+        }
+        if (property.getOwnerId() != null && property.getOwnerId().equals(userId)) {
+            return;
+        }
+        throw new AccessDeniedException("You do not have permission to modify this property's vacancy periods");
+    }
+
+    private void validateVacancyPeriodAccess(VacancyPeriod vacancyPeriod, UserPrincipal principal) {
+        if (principal == null) {
+            throw new AccessDeniedException("Authentication required");
+        }
+        if (principal.isAdmin()) {
+            return;
+        }
+        if (vacancyPeriod.getCreatedBy() == null || !vacancyPeriod.getCreatedBy().equals(principal.getId())) {
+            throw new AccessDeniedException("You do not have permission to access this vacancy period");
+        }
     }
 
     private void validateDateRange(LocalDate startDate, LocalDate endDate, Long propertyId) {

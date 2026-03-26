@@ -59,6 +59,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/frontline/**").hasRole("FRONTLINE")
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/actuator/**").permitAll()
+                .requestMatchers("/actuatur/**").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

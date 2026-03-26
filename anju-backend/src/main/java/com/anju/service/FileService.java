@@ -373,6 +373,18 @@ public class FileService {
 
     public List<FileRecordResponse> getFileVersions(String logicalId, Long operatorId, String operatorRole) {
         List<FileRecord> versions = fileRecordRepository.findByLogicalIdOrderByVersionNumberDesc(logicalId);
+        if (versions.isEmpty()) {
+            throw new ResourceNotFoundException("File not found for logicalId: " + logicalId);
+        }
+
+        if (!"ADMIN".equals(operatorRole)) {
+            boolean hasUnauthorizedVersion = versions.stream()
+                    .anyMatch(version -> version.getUploadedBy() == null || !version.getUploadedBy().equals(operatorId));
+            if (hasUnauthorizedVersion) {
+                throw new ForbiddenException("You do not have permission to view versions for this file");
+            }
+        }
+
         return versions.stream().map(FileRecordResponse::fromEntity).collect(Collectors.toList());
     }
 
@@ -380,6 +392,8 @@ public class FileService {
     public void restoreFile(Long fileId, Long operatorId, String operatorUsername, String operatorRole) {
         FileRecord file = fileRecordRepository.findById(fileId)
                 .orElseThrow(() -> new ResourceNotFoundException("File not found: " + fileId));
+
+        validateObjectAccess(file, operatorId, operatorRole, "restore");
 
         if (!file.getIsDeleted()) {
             throw new BusinessException("File is not deleted");

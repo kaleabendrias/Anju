@@ -65,6 +65,46 @@ public class AppointmentService {
         return createAppointmentInternal(request, operatorId);
     }
 
+    @Transactional
+    public AppointmentResponse createAppointment(Appointment appointment, Long operatorId) {
+        validateServiceTypeAndDuration(appointment);
+        validateTimeRange(appointment.getStartTime(), appointment.getEndTime(), true);
+        checkConflicts(appointment.getAccompanyingStaffId(), appointment.getResourceId(),
+                appointment.getStartTime(), appointment.getEndTime(), null);
+
+        if (appointment.getUniqueAppointmentNumber() == null || appointment.getUniqueAppointmentNumber().isBlank()) {
+            appointment.setUniqueAppointmentNumber(generateUniqueAppointmentNumber());
+        }
+        if (appointment.getStatus() == null) {
+            appointment.setStatus(AppointmentStatus.PENDING);
+        }
+        if (appointment.getRescheduleCount() == null) {
+            appointment.setRescheduleCount(0);
+        }
+        if (appointment.getOperatorId() == null) {
+            appointment.setOperatorId(operatorId);
+        }
+
+        Appointment saved = appointmentRepository.save(appointment);
+
+        auditLogService.logOperation(
+                saved.getId(),
+                "APPOINTMENT",
+                AuditLogService.OPERATION_CREATE,
+                operatorId,
+                null,
+                String.format("{\"patient\":\"%s\",\"service_type\":\"%s\",\"start\":\"%s\",\"end\":\"%s\"}",
+                        saved.getPatientName(), saved.getServiceType(), saved.getStartTime(), saved.getEndTime()),
+                "Created appointment: " + saved.getId() + " (" + saved.getServiceType().getDisplayName() + ")",
+                null
+        );
+
+        log.info("Appointment created via import: id={}, patient={}, serviceType={}, startTime={}",
+                saved.getId(), saved.getPatientName(), saved.getServiceType(), saved.getStartTime());
+
+        return AppointmentResponse.fromEntity(saved);
+    }
+
     private AppointmentResponse createAppointmentInternal(AppointmentCreateRequest request, Long operatorId) {
         validateServiceTypeAndDuration(request);
         validateTimeRange(request.getStartTime(), request.getEndTime(), true);
@@ -231,7 +271,7 @@ public class AppointmentService {
     public List<AppointmentResponse> getAllAppointments(Long operatorId, String operatorRole) {
         List<Appointment> appointments;
         
-        if ("ADMIN".equals(operatorRole) || "DISPATCHER".equals(operatorRole)) {
+        if ("ADMIN".equals(operatorRole)) {
             appointments = appointmentRepository.findAll();
         } else {
             appointments = appointmentRepository.findByOperatorId(operatorId);
@@ -245,7 +285,7 @@ public class AppointmentService {
     public Page<AppointmentResponse> getAllAppointments(Long operatorId, String operatorRole, Pageable pageable) {
         Page<Appointment> appointments;
         
-        if ("ADMIN".equals(operatorRole) || "DISPATCHER".equals(operatorRole)) {
+        if ("ADMIN".equals(operatorRole)) {
             appointments = appointmentRepository.findAll(pageable);
         } else {
             appointments = appointmentRepository.findByOperatorId(operatorId, pageable);
@@ -260,8 +300,49 @@ public class AppointmentService {
                 .collect(Collectors.toList());
     }
 
+    public List<AppointmentResponse> getAppointmentsByStatus(AppointmentStatus status, Long operatorId, String operatorRole) {
+        List<Appointment> appointments;
+        if ("ADMIN".equals(operatorRole)) {
+            appointments = appointmentRepository.findByStatus(status);
+        } else {
+            appointments = appointmentRepository.findByStatusAndOperatorId(status, operatorId);
+        }
+
+        return appointments.stream()
+                .map(AppointmentResponse::fromEntity)
+                .collect(Collectors.toList());
+    }
+
     public Page<AppointmentResponse> getAppointmentsByStatus(AppointmentStatus status, Pageable pageable) {
         return appointmentRepository.findByStatus(status, pageable).map(AppointmentResponse::fromEntity);
+    }
+
+    public Page<AppointmentResponse> getAppointmentsByStatus(
+            AppointmentStatus status,
+            Long operatorId,
+            String operatorRole,
+            Pageable pageable) {
+        Page<Appointment> appointments;
+        if ("ADMIN".equals(operatorRole)) {
+            appointments = appointmentRepository.findByStatus(status, pageable);
+        } else {
+            appointments = appointmentRepository.findByStatusAndOperatorId(status, operatorId, pageable);
+        }
+        return appointments.map(AppointmentResponse::fromEntity);
+    }
+
+    public List<Appointment> getVisibleAppointmentsForExport(Long operatorId, String operatorRole, AppointmentStatus status) {
+        if (status == null) {
+            if ("ADMIN".equals(operatorRole)) {
+                return appointmentRepository.findAll();
+            }
+            return appointmentRepository.findByOperatorId(operatorId);
+        }
+
+        if ("ADMIN".equals(operatorRole)) {
+            return appointmentRepository.findByStatus(status);
+        }
+        return appointmentRepository.findByStatusAndOperatorId(status, operatorId);
     }
 
     @Transactional
@@ -433,10 +514,6 @@ public class AppointmentService {
             return;
         }
 
-        if ("DISPATCHER".equals(operatorRole)) {
-            return;
-        }
-
         if (appointment.getOperatorId() != null && appointment.getOperatorId().equals(operatorId)) {
             return;
         }
@@ -468,6 +545,34 @@ public class AppointmentService {
                         durationMinutes,
                         ServiceType.fromDuration(request.getServiceType().getDurationMinutes()),
                         request.getServiceType().getDurationMinutes()));
+            }
+        }
+    }
+
+    private void validateServiceTypeAndDuration(Appointment appointment) {
+        if (appointment.getServiceType() == null) {
+            throw new BusinessException("Service type is required");
+        }
+        
+        if (appointment.getStartTime() != null && appointment.getEndTime() != null) {
+            int durationMinutes = (int) Duration.between(appointment.getStartTime(), appointment.getEndTime()).toMinutes();
+            
+            if (!STANDARD_DURATIONS.contains(durationMinutes)) {
+                throw new BusinessException(String.format(
+                        "Invalid appointment duration: %d minutes. Standard durations are: 15, 30, 60, or 90 minutes", 
+                        durationMinutes));
+            }
+            
+            if (appointment.getServiceType().getDurationMinutes() != durationMinutes) {
+                throw new BusinessException(String.format(
+                        "Service type duration (%d min) does not match appointment duration (%d min). " +
+                        "Use service type '%s' for %d-minute appointments or '%s' for %d-minute appointments",
+                        appointment.getServiceType().getDurationMinutes(),
+                        durationMinutes,
+                        ServiceType.fromDuration(durationMinutes),
+                        durationMinutes,
+                        ServiceType.fromDuration(appointment.getServiceType().getDurationMinutes()),
+                        appointment.getServiceType().getDurationMinutes()));
             }
         }
     }

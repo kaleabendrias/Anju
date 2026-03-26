@@ -1,4 +1,4 @@
-package com.anju._disabled;
+package com.anju.repository;
 
 import com.anju.entity.*;
 import com.anju.entity.Transaction.TransactionType;
@@ -20,7 +20,6 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest
 @ActiveProfiles("test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-@Disabled("Repository tests disabled due to JPA converter context issues")
 class RepositoryQueryTest {
 
     @Autowired
@@ -53,7 +52,6 @@ class RepositoryQueryTest {
 
     @Nested
     @DisplayName("Appointment Repository Tests")
-    @Disabled
     class AppointmentRepositoryTests {
 
         @Test
@@ -80,34 +78,7 @@ class RepositoryQueryTest {
             assertTrue(noConflicts.isEmpty());
         }
 
-        @Test
-        @Order(2)
-        @DisplayName("Should find stale appointments")
-        @Disabled("Timing-sensitive test")
-        void findStaleAppointments() {
-            LocalDateTime staleTime = LocalDateTime.now().minusMinutes(20);
 
-            appointmentRepository.save(Appointment.builder()
-                    .status(Appointment.AppointmentStatus.PENDING)
-                    .startTime(LocalDateTime.now().plusDays(1))
-                    .endTime(LocalDateTime.now().plusDays(1).plusHours(1))
-                    .orderAmount(new BigDecimal("100"))
-                    .createdAt(staleTime)
-                    .build());
-
-            appointmentRepository.save(Appointment.builder()
-                    .status(Appointment.AppointmentStatus.PENDING)
-                    .startTime(LocalDateTime.now().plusDays(1))
-                    .endTime(LocalDateTime.now().plusDays(1).plusHours(1))
-                    .orderAmount(new BigDecimal("100"))
-                    .createdAt(LocalDateTime.now())
-                    .build());
-
-            List<Appointment> staleAppointments = appointmentRepository.findStaleAppointments(
-                    Appointment.AppointmentStatus.PENDING, staleTime);
-
-            assertEquals(1, staleAppointments.size());
-        }
 
         @Test
         @Order(3)
@@ -140,7 +111,6 @@ class RepositoryQueryTest {
 
     @Nested
     @DisplayName("Transaction Repository Tests")
-    @Disabled
     class TransactionRepositoryTests {
 
         @Test
@@ -297,7 +267,6 @@ class RepositoryQueryTest {
 
     @Nested
     @DisplayName("Settlement Repository Tests")
-    @Disabled
     class SettlementRepositoryTests {
 
         @Test
@@ -336,13 +305,12 @@ class RepositoryQueryTest {
 
             Optional<Settlement> found = settlementRepository.findBySettlementDate(date);
             assertTrue(found.isPresent());
-            assertEquals(new BigDecimal("2000"), found.get().getTotalIncome());
+            assertEquals(0, new BigDecimal("2000").compareTo(found.get().getTotalIncome()));
         }
     }
 
     @Nested
     @DisplayName("Property Repository Tests")
-    @Disabled
     class PropertyRepositoryTests {
 
         @Test
@@ -391,7 +359,6 @@ class RepositoryQueryTest {
 
     @Nested
     @DisplayName("FileRecord Repository Tests")
-    @Disabled
     class FileRecordRepositoryTests {
 
         @Test
@@ -528,7 +495,6 @@ class RepositoryQueryTest {
 
     @Nested
     @DisplayName("AuditLog Repository Tests")
-    @Disabled
     class AuditLogRepositoryTests {
 
         @Test

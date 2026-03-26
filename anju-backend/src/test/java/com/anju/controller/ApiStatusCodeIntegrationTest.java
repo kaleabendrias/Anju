@@ -2,18 +2,18 @@ package com.anju.controller;
 
 import com.anju.dto.*;
 import com.anju.entity.Appointment;
-import com.anju.entity.Appointment.AppointmentStatus;
 import com.anju.entity.Property;
 import com.anju.entity.User;
 import com.anju.repository.*;
+import com.anju.security.JwtTokenProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
@@ -25,6 +25,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@TestPropertySource(properties = {
+    "spring.cloud.nacos.config.enabled=false",
+    "spring.cloud.nacos.discovery.enabled=false"
+})
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class ApiStatusCodeIntegrationTest {
 
@@ -49,8 +53,15 @@ class ApiStatusCodeIntegrationTest {
     @Autowired
     private SettlementRepository settlementRepository;
 
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
+
     private User adminUser;
     private User frontlineUser;
+    private User financeUser;
+    private String adminToken;
+    private String frontlineToken;
+    private String financeToken;
 
     @BeforeEach
     void setUp() {
@@ -71,6 +82,16 @@ class ApiStatusCodeIntegrationTest {
                 .passwordHash("$2a$10$encoded")
                 .role(User.Role.FRONTLINE)
                 .build());
+
+        financeUser = userRepository.save(User.builder()
+                .username("finance_" + System.currentTimeMillis())
+                .passwordHash("$2a$10$encoded")
+                .role(User.Role.FINANCE)
+                .build());
+
+        adminToken = jwtTokenProvider.generateToken(adminUser.getUsername(), adminUser.getRole().name());
+        frontlineToken = jwtTokenProvider.generateToken(frontlineUser.getUsername(), frontlineUser.getRole().name());
+        financeToken = jwtTokenProvider.generateToken(financeUser.getUsername(), financeUser.getRole().name());
     }
 
     @Nested
@@ -152,7 +173,6 @@ class ApiStatusCodeIntegrationTest {
         @Test
         @Order(1)
         @DisplayName("FRONTLINE accessing admin endpoint should return 403")
-        @WithMockUser(roles = "FRONTLINE")
         void frontlineAccessingAdmin_returns403() throws Exception {
             PropertyCreateRequest request = PropertyCreateRequest.builder()
                     .uniqueCode("TEST002")
@@ -161,6 +181,7 @@ class ApiStatusCodeIntegrationTest {
                     .build();
 
             mockMvc.perform(post("/api/admin/properties")
+                            .header("Authorization", "Bearer " + frontlineToken)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isForbidden());
@@ -169,18 +190,18 @@ class ApiStatusCodeIntegrationTest {
         @Test
         @Order(2)
         @DisplayName("Should return 403 for permanent delete without admin role")
-        @WithMockUser(roles = "FRONTLINE")
         void permanentDeleteWithoutAdmin_returns403() throws Exception {
-            mockMvc.perform(delete("/api/files/1/permanent"))
+            mockMvc.perform(delete("/api/files/1/permanent")
+                            .header("Authorization", "Bearer " + frontlineToken))
                     .andExpect(status().isForbidden());
         }
 
         @Test
         @Order(3)
         @DisplayName("GET /api/admin/appointments - FRONTLINE should return 200")
-        @WithMockUser(roles = "FRONTLINE")
         void frontlineAccessingAdminAppointments_returns200() throws Exception {
-            mockMvc.perform(get("/api/admin/appointments"))
+            mockMvc.perform(get("/api/admin/appointments")
+                            .header("Authorization", "Bearer " + frontlineToken))
                     .andExpect(status().isOk());
         }
     }
@@ -193,36 +214,36 @@ class ApiStatusCodeIntegrationTest {
         @Test
         @Order(1)
         @DisplayName("GET /api/properties/{id} - should return 404 for non-existent property")
-        @WithMockUser(roles = "ADMIN")
         void getNonExistentProperty_returns404() throws Exception {
-            mockMvc.perform(get("/api/properties/99999"))
+            mockMvc.perform(get("/api/properties/99999")
+                            .header("Authorization", "Bearer " + adminToken))
                     .andExpect(status().isNotFound());
         }
 
         @Test
         @Order(2)
         @DisplayName("GET /api/appointments/{id} - should return 404 for non-existent appointment")
-        @WithMockUser(roles = "ADMIN")
         void getNonExistentAppointment_returns404() throws Exception {
-            mockMvc.perform(get("/api/appointments/99999"))
+            mockMvc.perform(get("/api/appointments/99999")
+                            .header("Authorization", "Bearer " + adminToken))
                     .andExpect(status().isNotFound());
         }
 
         @Test
         @Order(3)
         @DisplayName("GET /api/finance/transactions/{id} - should return 404 for non-existent transaction")
-        @WithMockUser(roles = "FINANCE")
         void getNonExistentTransaction_returns404() throws Exception {
-            mockMvc.perform(get("/api/finance/transactions/99999"))
+            mockMvc.perform(get("/api/finance/transactions/99999")
+                            .header("Authorization", "Bearer " + financeToken))
                     .andExpect(status().isNotFound());
         }
 
         @Test
         @Order(4)
         @DisplayName("GET /api/files/{id} - should return 404 for non-existent file")
-        @WithMockUser(roles = "ADMIN")
         void getNonExistentFile_returns404() throws Exception {
-            mockMvc.perform(get("/api/files/99999"))
+            mockMvc.perform(get("/api/files/99999")
+                            .header("Authorization", "Bearer " + adminToken))
                     .andExpect(status().isNotFound());
         }
     }
@@ -235,7 +256,6 @@ class ApiStatusCodeIntegrationTest {
         @Test
         @Order(1)
         @DisplayName("Creating property with duplicate unique code should return 409")
-        @WithMockUser(roles = "ADMIN")
         void duplicateUniqueCode_returns409() throws Exception {
             Property existing = propertyRepository.save(Property.builder()
                     .uniqueCode("DUPLICATE001")
@@ -251,6 +271,7 @@ class ApiStatusCodeIntegrationTest {
                     .build();
 
             mockMvc.perform(post("/api/admin/properties")
+                            .header("Authorization", "Bearer " + adminToken)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isConflict());
@@ -265,13 +286,13 @@ class ApiStatusCodeIntegrationTest {
         @Test
         @Order(1)
         @DisplayName("Creating property with missing required fields should return 400")
-        @WithMockUser(roles = "ADMIN")
         void createPropertyWithMissingFields_returns400() throws Exception {
             PropertyCreateRequest request = PropertyCreateRequest.builder()
                     .uniqueCode("")
                     .build();
 
             mockMvc.perform(post("/api/admin/properties")
+                            .header("Authorization", "Bearer " + adminToken)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isBadRequest());
@@ -280,7 +301,6 @@ class ApiStatusCodeIntegrationTest {
         @Test
         @Order(2)
         @DisplayName("Creating appointment with past start time should return 400")
-        @WithMockUser(roles = "ADMIN")
         void createAppointmentWithPastTime_returns400() throws Exception {
             AppointmentCreateRequest request = AppointmentCreateRequest.builder()
                     .startTime(LocalDateTime.now().minusDays(1))
@@ -290,6 +310,7 @@ class ApiStatusCodeIntegrationTest {
                     .build();
 
             mockMvc.perform(post("/api/admin/appointments")
+                            .header("Authorization", "Bearer " + adminToken)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isBadRequest());
@@ -298,7 +319,6 @@ class ApiStatusCodeIntegrationTest {
         @Test
         @Order(3)
         @DisplayName("Creating appointment with end time before start time should return 400")
-        @WithMockUser(roles = "ADMIN")
         void createAppointmentWithInvalidTimeRange_returns400() throws Exception {
             AppointmentCreateRequest request = AppointmentCreateRequest.builder()
                     .startTime(LocalDateTime.now().plusDays(2))
@@ -308,6 +328,7 @@ class ApiStatusCodeIntegrationTest {
                     .build();
 
             mockMvc.perform(post("/api/admin/appointments")
+                            .header("Authorization", "Bearer " + adminToken)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isBadRequest());

@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -239,6 +240,60 @@ class FileServiceTest {
                     fileRecordRepository, chunkInfoRepository, auditLogService, secondaryVerificationService, dataMasker);
             
             assertNotNull(service);
+        }
+    }
+
+    @Nested
+    @DisplayName("Authorization Tests")
+    class AuthorizationTests {
+
+        @Test
+        @DisplayName("Should deny non-owner from listing file versions")
+        void shouldDenyNonOwnerFromListingVersions() {
+            FileRecord ownerVersion = FileRecord.builder()
+                    .id(1L)
+                    .logicalId("LOGICAL-1")
+                    .uploadedBy(999L)
+                    .versionNumber(1)
+                    .build();
+
+            when(fileRecordRepository.findByLogicalIdOrderByVersionNumberDesc("LOGICAL-1"))
+                    .thenReturn(List.of(ownerVersion));
+
+            assertThrows(com.anju.exception.ForbiddenException.class,
+                    () -> fileService.getFileVersions("LOGICAL-1", 100L, "FRONTLINE"));
+        }
+
+        @Test
+        @DisplayName("Should allow owner to list file versions")
+        void shouldAllowOwnerToListVersions() {
+            FileRecord ownerVersion = FileRecord.builder()
+                    .id(1L)
+                    .logicalId("LOGICAL-1")
+                    .uploadedBy(100L)
+                    .versionNumber(2)
+                    .build();
+
+            when(fileRecordRepository.findByLogicalIdOrderByVersionNumberDesc("LOGICAL-1"))
+                    .thenReturn(List.of(ownerVersion));
+
+            List<FileRecordResponse> versions = fileService.getFileVersions("LOGICAL-1", 100L, "FRONTLINE");
+            assertEquals(1, versions.size());
+        }
+
+        @Test
+        @DisplayName("Should deny non-owner from restoring deleted file")
+        void shouldDenyNonOwnerRestore() {
+            FileRecord deleted = FileRecord.builder()
+                    .id(10L)
+                    .uploadedBy(999L)
+                    .isDeleted(true)
+                    .build();
+
+            when(fileRecordRepository.findById(10L)).thenReturn(Optional.of(deleted));
+
+            assertThrows(com.anju.exception.ForbiddenException.class,
+                    () -> fileService.restoreFile(10L, 100L, "frontline", "FRONTLINE"));
         }
     }
 }

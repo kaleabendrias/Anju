@@ -4,6 +4,7 @@ import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.Cipher;
@@ -14,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.Base64;
 
 @Service
@@ -23,10 +25,14 @@ public class FieldEncryptionService {
     private static final String ALGORITHM = "AES/GCM/NoPadding";
     private static final int GCM_TAG_LENGTH = 128;
     private static final int GCM_IV_LENGTH = 12;
+    private static final int MIN_KEY_LENGTH = 16;
+    private static final String KEY_HEX_CHARS = "0123456789ABCDEF";
 
     private final SecureRandom secureRandom;
+    private final Environment environment;
     private SecretKey encryptionKey;
     private boolean encryptionEnabled;
+    private boolean properlyInitialized = false;
 
     @Value("${security.field-encryption.enabled:true}")
     private boolean encryptionConfigEnabled;
@@ -34,28 +40,70 @@ public class FieldEncryptionService {
     @Value("${security.field-encryption.key:}")
     private String encryptionKeyMaterial;
 
-    public FieldEncryptionService() {
+    public FieldEncryptionService(Environment environment) {
         this.secureRandom = new SecureRandom();
+        this.environment = environment;
     }
 
     @PostConstruct
     public void init() {
         this.encryptionEnabled = encryptionConfigEnabled;
         
+        boolean isTestProfile = Arrays.stream(environment.getActiveProfiles())
+                .anyMatch(profile -> profile.equalsIgnoreCase("test") || 
+                                    profile.equalsIgnoreCase("unit") ||
+                                    profile.equalsIgnoreCase("dev"));
+
         if (encryptionKeyMaterial != null && !encryptionKeyMaterial.isEmpty()) {
+            if (encryptionKeyMaterial.length() < MIN_KEY_LENGTH) {
+                log.error("SECURITY ERROR: Provided encryption key is too short. Minimum length: {} characters", MIN_KEY_LENGTH);
+                throw new IllegalStateException(
+                        "SECURITY CONFIGURATION ERROR: Encryption key must be at least " + MIN_KEY_LENGTH + " characters long."
+                );
+            }
+            
             this.encryptionKey = deriveKey(encryptionKeyMaterial);
-            log.info("Field-level encryption initialized with provided key (enabled: {})", encryptionEnabled);
+            this.properlyInitialized = true;
+            log.info("Field-level encryption initialized with provided key (enabled: {}, keyLength: {})", 
+                    encryptionEnabled, encryptionKeyMaterial.length());
         } else {
+            if (!isTestProfile) {
+                log.error("=".repeat(70));
+                log.error("SECURITY CRITICAL FAILURE: Field encryption key is NOT configured.");
+                log.error("=".repeat(70));
+                log.error("The application is starting in a non-test profile without an encryption key.");
+                log.error("This is a SECURITY VIOLATION and the application cannot start.");
+                log.error("");
+                log.error("REQUIRED ACTION: Set the following environment variable or property:");
+                log.error("  security.field-encryption.key=<your-secure-key-minimum-" + MIN_KEY_LENGTH + "-characters>");
+                log.error("");
+                log.error("Example: export security.field-encryption.key='YourSecureEncryptionKey123!'");
+                log.error("=".repeat(70));
+                throw new IllegalStateException(
+                        "SECURITY CONFIGURATION ERROR: Field encryption key is required in production profiles. " +
+                        "Set 'security.field-encryption.key' with a secure key (minimum " + MIN_KEY_LENGTH + " characters). " +
+                        "Application startup aborted."
+                );
+            }
+            
+            log.warn("Test profile detected - generating temporary encryption key for testing only.");
             byte[] randomKey = new byte[32];
             secureRandom.nextBytes(randomKey);
             this.encryptionKey = new SecretKeySpec(randomKey, "AES");
-            log.warn("Field-level encryption initialized with auto-generated key - NOT SUITABLE FOR PRODUCTION. Set security.field-encryption.key property.");
+            this.properlyInitialized = true;
+            this.encryptionEnabled = false;
+            log.warn("WARNING: Using auto-generated encryption key in test mode. " +
+                    "Data encrypted with this key cannot be decrypted in production!");
         }
     }
 
     public String encrypt(String plainText) {
         if (plainText == null || plainText.isEmpty()) {
             return plainText;
+        }
+        
+        if (!properlyInitialized) {
+            throw new IllegalStateException("Encryption service not properly initialized");
         }
         
         if (!encryptionEnabled) {
@@ -78,14 +126,18 @@ public class FieldEncryptionService {
 
             return Base64.getEncoder().encodeToString(combined);
         } catch (Exception e) {
-            log.error("Encryption failed, returning masked value", e);
-            return "ENC_FAILED:" + hashSha256(plainText).substring(0, 16);
+            log.error("Encryption failed", e);
+            throw new RuntimeException("Encryption operation failed", e);
         }
     }
 
     public String decrypt(String encryptedText) {
         if (encryptedText == null || encryptedText.isEmpty()) {
             return encryptedText;
+        }
+        
+        if (!properlyInitialized) {
+            throw new IllegalStateException("Encryption service not properly initialized");
         }
         
         if (!encryptionEnabled) {
@@ -112,13 +164,17 @@ public class FieldEncryptionService {
             byte[] decryptedData = cipher.doFinal(encryptedData);
             return new String(decryptedData, StandardCharsets.UTF_8);
         } catch (Exception e) {
-            log.error("Decryption failed", e);
-            return null;
+            log.error("Decryption failed for value: {}", maskValue(encryptedText), e);
+            throw new RuntimeException("Decryption operation failed", e);
         }
     }
 
     public boolean isEncryptionEnabled() {
         return encryptionEnabled;
+    }
+
+    public boolean isProperlyInitialized() {
+        return properlyInitialized;
     }
 
     private SecretKey deriveKey(String keyMaterial) {
@@ -131,19 +187,18 @@ public class FieldEncryptionService {
         }
     }
 
-    private String hashSha256(String input) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
-            StringBuilder hexString = new StringBuilder();
-            for (byte b : hash) {
-                String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) hexString.append('0');
-                hexString.append(hex);
-            }
-            return hexString.toString();
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 not available", e);
+    private String maskValue(String value) {
+        if (value == null || value.length() <= 8) {
+            return "***";
         }
+        return value.substring(0, 4) + "****" + value.substring(value.length() - 4);
+    }
+
+    public String generateSecureKey() {
+        StringBuilder key = new StringBuilder(32);
+        for (int i = 0; i < 32; i++) {
+            key.append(KEY_HEX_CHARS.charAt(secureRandom.nextInt(KEY_HEX_CHARS.length())));
+        }
+        return key.toString();
     }
 }

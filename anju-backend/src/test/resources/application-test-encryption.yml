@@ -1,0 +1,52 @@
+spring:
+  application:
+    name: anju-backend-test-encryption
+  config:
+    import: "optional:nacos:"
+  cloud:
+    nacos:
+      config:
+        enabled: false
+      discovery:
+        enabled: false
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=MySQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  h2:
+    console:
+      enabled: false
+
+security:
+  jwt:
+    secret: "TestSecretKeyForJwtTokenGeneration2024VerySecureKey256BitsForTestingPurposes1234567890"
+    expiration: 86400000
+  encryption:
+    key: "test-encryption-key-for-unit-tests"
+  field-encryption:
+    enabled: true
+    key: "test-encryption-key-for-unit-tests"
+  fail-on-missing-secrets: false
+
+file:
+  storage:
+    path: ./test-storage
+  retention:
+    days: 30
+
+jwt:
+  secret: "TestSecretKeyForJwtTokenGeneration2024VerySecureKey256BitsForTestingPurposes1234567890"
+  expiration: 86400000
+
+logging:
+  level:
+    root: WARN
+    com.anju: INFO

@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -440,5 +441,94 @@ class SecuredEndpointIntegrationTest {
                             .param("date", LocalDate.now().minusDays(1).toString()))
                     .andExpect(status().isForbidden());
         }
+    }
+
+    @Nested
+    @DisplayName("Appointment Data Isolation")
+    class AppointmentIsolationTests {
+
+        @Test
+        @DisplayName("Should return only owner's appointments for status-filtered listing")
+        void shouldReturnOnlyOwnerAppointmentsForStatusFilteredListing() throws Exception {
+            createAppointment(adminToken, "Admin Patient", 1);
+            createAppointment(frontlineToken, "Frontline Patient", 2);
+
+            mockMvc.perform(get("/api/appointments")
+                            .param("status", "PENDING")
+                            .header("Authorization", "Bearer " + frontlineToken))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.data.content.length()").value(1))
+                    .andExpect(jsonPath("$.data.content[0].patientName").value("Frontline Patient"));
+        }
+    }
+
+    @Nested
+    @DisplayName("Appointment CSV Import/Export")
+    class AppointmentCsvImportExportTests {
+
+        @Test
+        @DisplayName("Should reject CSV import without authentication")
+        void shouldRejectImportWithoutAuthentication() throws Exception {
+            MockMultipartFile file = new MockMultipartFile(
+                    "file",
+                    "appointments.csv",
+                    "text/csv",
+                    "service_type,start_time,end_time,patient_name\nSTANDARD_CONSULTATION,2026-04-01 10:00:00,2026-04-01 10:30:00,Test User\n".getBytes());
+
+            mockMvc.perform(multipart("/api/admin/appointments/import").file(file))
+                    .andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        @DisplayName("Should enforce idempotency for CSV import")
+        void shouldEnforceIdempotencyForCsvImport() throws Exception {
+            MockMultipartFile file = new MockMultipartFile(
+                    "file",
+                    "appointments.csv",
+                    "text/csv",
+                    "service_type,start_time,end_time,patient_name\nSTANDARD_CONSULTATION,2026-04-01 10:00:00,2026-04-01 10:30:00,CSV User\n".getBytes());
+
+            String key = "csv-import-key-001";
+
+            mockMvc.perform(multipart("/api/admin/appointments/import")
+                            .file(file)
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", key))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.data.fromCache").value(false));
+
+            mockMvc.perform(multipart("/api/admin/appointments/import")
+                            .file(file)
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", key))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.data.fromCache").value(true));
+        }
+    }
+
+    private Long createAppointment(String token, String patientName, int dayOffset) throws Exception {
+        LocalDateTime startTime = LocalDateTime.now().plusDays(dayOffset).withHour(9).withMinute(0);
+        AppointmentCreateRequest request = AppointmentCreateRequest.builder()
+                .serviceType(com.anju.entity.Appointment.ServiceType.STANDARD_CONSULTATION)
+                .startTime(startTime)
+                .endTime(startTime.plusMinutes(30))
+                .patientName(patientName)
+                .orderAmount(new BigDecimal("100"))
+                .build();
+
+        MvcResult result = mockMvc.perform(post("/api/admin/appointments")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String content = result.getResponse().getContentAsString();
+        ApiResponse<AppointmentResponse> response = objectMapper.readValue(content,
+                objectMapper.getTypeFactory().constructParametricType(ApiResponse.class, AppointmentResponse.class));
+        return response.getData().getId();
     }
 }

@@ -32,10 +32,6 @@ public class VacancyPeriodController {
     public ResponseEntity<ApiResponse<VacancyPeriodResponse>> createVacancyPeriod(
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody VacancyPeriodCreateRequest request) {
-        if (principal == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("Authentication required"));
-        }
         VacancyPeriodResponse response = vacancyPeriodService.createVacancyPeriod(request, principal.getId());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Vacancy period created successfully", response));
@@ -47,11 +43,7 @@ public class VacancyPeriodController {
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long id,
             @Valid @RequestBody VacancyPeriodUpdateRequest request) {
-        if (principal == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("Authentication required"));
-        }
-        VacancyPeriodResponse response = vacancyPeriodService.updateVacancyPeriod(id, request, principal.getId());
+        VacancyPeriodResponse response = vacancyPeriodService.updateVacancyPeriod(id, request, principal);
         return ResponseEntity.ok(ApiResponse.success("Vacancy period updated successfully", response));
     }
 
@@ -59,11 +51,7 @@ public class VacancyPeriodController {
     public ResponseEntity<ApiResponse<VacancyPeriodResponse>> getVacancyPeriodById(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long id) {
-        if (principal == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("Authentication required"));
-        }
-        VacancyPeriodResponse response = vacancyPeriodService.getVacancyPeriodById(id);
+        VacancyPeriodResponse response = vacancyPeriodService.getVacancyPeriodById(id, principal);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -71,11 +59,7 @@ public class VacancyPeriodController {
     @PreAuthorize("hasAnyRole('ADMIN', 'FRONTLINE')")
     public ResponseEntity<ApiResponse<List<VacancyPeriodResponse>>> getAllVacancyPeriods(
             @AuthenticationPrincipal UserPrincipal principal) {
-        if (principal == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("Authentication required"));
-        }
-        List<VacancyPeriodResponse> response = vacancyPeriodService.getAllVacancyPeriods();
+        List<VacancyPeriodResponse> response = vacancyPeriodService.getAllVacancyPeriods(principal);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -83,11 +67,7 @@ public class VacancyPeriodController {
     public ResponseEntity<ApiResponse<List<VacancyPeriodResponse>>> getVacancyPeriodsByProperty(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long propertyId) {
-        if (principal == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("Authentication required"));
-        }
-        List<VacancyPeriodResponse> response = vacancyPeriodService.getVacancyPeriodsByProperty(propertyId);
+        List<VacancyPeriodResponse> response = vacancyPeriodService.getVacancyPeriodsByProperty(propertyId, principal);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -95,11 +75,7 @@ public class VacancyPeriodController {
     public ResponseEntity<ApiResponse<List<VacancyPeriodResponse>>> getActiveVacancyPeriodsForProperty(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long propertyId) {
-        if (principal == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("Authentication required"));
-        }
-        List<VacancyPeriodResponse> response = vacancyPeriodService.getActiveVacancyPeriodsForProperty(propertyId);
+        List<VacancyPeriodResponse> response = vacancyPeriodService.getActiveVacancyPeriodsForProperty(propertyId, principal);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -108,11 +84,7 @@ public class VacancyPeriodController {
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long propertyId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        if (principal == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("Authentication required"));
-        }
-        List<VacancyPeriodResponse> response = vacancyPeriodService.getCurrentVacancyPeriodsForProperty(propertyId, date);
+        List<VacancyPeriodResponse> response = vacancyPeriodService.getCurrentVacancyPeriodsForProperty(propertyId, date, principal);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -122,11 +94,7 @@ public class VacancyPeriodController {
             @PathVariable Long propertyId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-        if (principal == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("Authentication required"));
-        }
-        List<VacancyPeriodResponse> response = vacancyPeriodService.getOverlappingVacancyPeriods(propertyId, startDate, endDate);
+        List<VacancyPeriodResponse> response = vacancyPeriodService.getOverlappingVacancyPeriods(propertyId, startDate, endDate, principal);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -135,11 +103,7 @@ public class VacancyPeriodController {
     public ResponseEntity<ApiResponse<Void>> deleteVacancyPeriod(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long id) {
-        if (principal == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("Authentication required"));
-        }
-        vacancyPeriodService.deleteVacancyPeriod(id, principal.getId());
+        vacancyPeriodService.deleteVacancyPeriod(id, principal);
         return ResponseEntity.ok(ApiResponse.success("Vacancy period deleted successfully", null));
     }
 
@@ -148,11 +112,7 @@ public class VacancyPeriodController {
     public ResponseEntity<ApiResponse<Void>> deactivateVacancyPeriod(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long id) {
-        if (principal == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("Authentication required"));
-        }
-        vacancyPeriodService.deactivateVacancyPeriod(id, principal.getId());
+        vacancyPeriodService.deactivateVacancyPeriod(id, principal);
         return ResponseEntity.ok(ApiResponse.success("Vacancy period deactivated successfully", null));
     }
 }

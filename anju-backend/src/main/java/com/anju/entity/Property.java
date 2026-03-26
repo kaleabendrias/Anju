@@ -19,7 +19,8 @@ import java.util.List;
 @Table(name = "properties", indexes = {
     @Index(name = "idx_unique_code", columnList = "unique_code", unique = true),
     @Index(name = "idx_property_status", columnList = "status"),
-    @Index(name = "idx_compliance_status", columnList = "compliance_status")
+    @Index(name = "idx_compliance_status", columnList = "compliance_status"),
+    @Index(name = "idx_property_owner", columnList = "owner_id")
 })
 // @Data
 // @Builder
@@ -33,6 +34,9 @@ public class Property {
 
     @Column(name = "unique_code", nullable = false, unique = true, length = 50)
     private String uniqueCode;
+
+    @Column(name = "owner_id")
+    private Long ownerId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -82,13 +86,14 @@ public class Property {
 
     public Property() {}
 
-    public Property(Long id, String uniqueCode, PropertyStatus status, ComplianceStatus complianceStatus,
+    public Property(Long id, String uniqueCode, Long ownerId, PropertyStatus status, ComplianceStatus complianceStatus,
                     BigDecimal rent, BigDecimal deposit, LocalDate rentalStartDate, LocalDate rentalEndDate,
                     String materialsJson, String complianceValidationsJson, String complianceNotes,
                     LocalDateTime lastComplianceCheck, Long complianceCheckedBy, List<VacancyPeriod> vacancyPeriods,
                     LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.uniqueCode = uniqueCode;
+        this.ownerId = ownerId;
         this.status = status;
         this.complianceStatus = complianceStatus;
         this.rent = rent;
@@ -112,6 +117,7 @@ public class Property {
     public static class PropertyBuilder {
         private Long id;
         private String uniqueCode;
+        private Long ownerId;
         private PropertyStatus status;
         private ComplianceStatus complianceStatus = ComplianceStatus.NOT_STARTED;
         private BigDecimal rent;
@@ -129,6 +135,7 @@ public class Property {
 
         public PropertyBuilder id(Long id) { this.id = id; return this; }
         public PropertyBuilder uniqueCode(String uniqueCode) { this.uniqueCode = uniqueCode; return this; }
+        public PropertyBuilder ownerId(Long ownerId) { this.ownerId = ownerId; return this; }
         public PropertyBuilder status(PropertyStatus status) { this.status = status; return this; }
         public PropertyBuilder complianceStatus(ComplianceStatus complianceStatus) { this.complianceStatus = complianceStatus; return this; }
         public PropertyBuilder rent(BigDecimal rent) { this.rent = rent; return this; }
@@ -145,7 +152,7 @@ public class Property {
         public PropertyBuilder updatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; return this; }
 
         public Property build() {
-            return new Property(id, uniqueCode, status, complianceStatus, rent, deposit, rentalStartDate,
+            return new Property(id, uniqueCode, ownerId, status, complianceStatus, rent, deposit, rentalStartDate,
                 rentalEndDate, materialsJson, complianceValidationsJson, complianceNotes, lastComplianceCheck,
                 complianceCheckedBy, vacancyPeriods, createdAt, updatedAt);
         }
@@ -155,6 +162,8 @@ public class Property {
     public void setId(Long id) { this.id = id; }
     public String getUniqueCode() { return uniqueCode; }
     public void setUniqueCode(String uniqueCode) { this.uniqueCode = uniqueCode; }
+    public Long getOwnerId() { return ownerId; }
+    public void setOwnerId(Long ownerId) { this.ownerId = ownerId; }
     public PropertyStatus getStatus() { return status; }
     public void setStatus(PropertyStatus status) { this.status = status; }
     public ComplianceStatus getComplianceStatus() { return complianceStatus; }

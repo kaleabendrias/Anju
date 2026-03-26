@@ -71,7 +71,10 @@ services:
       # Security - REQUIRED for production
       - JWT_SECRET=${JWT_SECRET:-YourSuperSecretKeyThatIsAtLeast64CharactersLongForSecurity2024!!}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-encryption-key-16chars}
+      - SECURITY_FIELD_ENCRYPTION_KEY=${SECURITY_FIELD_ENCRYPTION_KEY:-encryption-key-16chars}
       - FAIL_ON_MISSING_SECRETS=${FAIL_ON_MISSING_SECRETS:-false}
+    volumes:
+      - maven-cache:/root/.m2
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
       interval: 30s
@@ -90,3 +93,5 @@ networks:
 volumes:
   mysql-data:
     name: anju-mysql-data
+  maven-cache:
+    name: anju-maven-cache

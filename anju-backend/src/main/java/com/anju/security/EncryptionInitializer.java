@@ -4,6 +4,7 @@ import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.Cipher;
@@ -12,6 +13,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.Base64;
 
 @Component
@@ -22,10 +24,18 @@ public class EncryptionInitializer {
     private static final int GCM_TAG_LENGTH = 128;
     private static final int GCM_IV_LENGTH = 12;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final int MIN_KEY_LENGTH = 16;
 
     public static SecretKeySpec encryptionKey;
     public static volatile boolean encryptionEnabled = false;
     private static volatile boolean initialized = false;
+    private static volatile boolean initializationFailed = false;
+
+    private final Environment environment;
+
+    public EncryptionInitializer(Environment environment) {
+        this.environment = environment;
+    }
 
     @Value("${security.field-encryption.enabled:true}")
     private void setEncryptionEnabled(boolean enabled) {
@@ -37,19 +47,46 @@ public class EncryptionInitializer {
         if (!initialized && keyMaterial != null && !keyMaterial.isEmpty()) {
             encryptionKey = deriveKey(keyMaterial);
             initialized = true;
-            log.info("Field-level encryption initialized (enabled: {})", encryptionEnabled);
+            log.info("Field-level encryption initialized with provided key (enabled: {})", encryptionEnabled);
         }
     }
 
     @PostConstruct
     public void init() {
-        if (!initialized) {
-            byte[] randomKey = new byte[32];
-            SECURE_RANDOM.nextBytes(randomKey);
-            encryptionKey = new SecretKeySpec(randomKey, "AES");
-            encryptionEnabled = false;
-            log.warn("Field-level encryption initialized with auto-generated key - encryption disabled");
+        if (initialized) {
+            return;
         }
+
+        boolean isTestProfile = Arrays.stream(environment.getActiveProfiles())
+                .anyMatch(profile -> profile.equalsIgnoreCase("test") || profile.equalsIgnoreCase("unit"));
+
+        if (!isTestProfile) {
+            initializationFailed = true;
+            log.error("SECURITY CRITICAL: Field encryption key is required in non-test profiles.");
+            log.error("Please set 'security.field-encryption.key' property with a secure key (minimum {} characters).", MIN_KEY_LENGTH);
+            log.error("Application startup aborted due to missing encryption configuration.");
+            throw new IllegalStateException(
+                    "SECURITY CONFIGURATION ERROR: Field encryption key is required. " +
+                    "Set 'security.field-encryption.key' property with a secure key (minimum " + MIN_KEY_LENGTH + " characters). " +
+                    "Application cannot start in production/test profiles without proper encryption configuration."
+            );
+        }
+
+        log.warn("Running in test profile - using auto-generated encryption key. NOT SUITABLE FOR PRODUCTION.");
+        byte[] randomKey = new byte[32];
+        SECURE_RANDOM.nextBytes(randomKey);
+        encryptionKey = new SecretKeySpec(randomKey, "AES");
+        encryptionEnabled = false;
+        initialized = true;
+        log.info("Field-level encryption initialized in test mode with auto-generated key");
+    }
+
+    public static boolean isInitializationFailed() {
+        return initializationFailed;
+    }
+
+    public static boolean isProperlyConfigured() {
+        return initialized && !initializationFailed && encryptionKey != null;
     }
 
     private static SecretKeySpec deriveKey(String keyMaterial) {
@@ -65,6 +102,9 @@ public class EncryptionInitializer {
     public static String encrypt(String attribute) {
         if (attribute == null) {
             return null;
+        }
+        if (initializationFailed) {
+            throw new IllegalStateException("Encryption service failed to initialize properly");
         }
         if (!encryptionEnabled || encryptionKey == null) {
             return attribute;
@@ -85,13 +125,16 @@ public class EncryptionInitializer {
 
             return Base64.getEncoder().encodeToString(combined);
         } catch (Exception e) {
-            return attribute;
+            throw new RuntimeException("Encryption failed", e);
         }
     }
 
     public static String decrypt(String dbData) {
         if (dbData == null) {
             return null;
+        }
+        if (initializationFailed) {
+            throw new IllegalStateException("Encryption service failed to initialize properly");
         }
         if (!encryptionEnabled || encryptionKey == null) {
             return dbData;
@@ -111,7 +154,7 @@ public class EncryptionInitializer {
             byte[] decryptedData = cipher.doFinal(encryptedData);
             return new String(decryptedData, StandardCharsets.UTF_8);
         } catch (Exception e) {
-            return dbData;
+            throw new RuntimeException("Decryption failed", e);
         }
     }
 }

@@ -173,15 +173,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.1.2</version>
                 <configuration>
-                    <excludes>
-                        <exclude>**/RepositoryQueryTest**</exclude>
-                        <exclude>**/ApiStatusCodeIntegrationTest**</exclude>
-                        <exclude>**/SensitiveDataLeakageTest**</exclude>
-                        <exclude>**/*ConcurrencyTests**</exclude>
-                        <exclude>**/FileCriticalPathTest**</exclude>
-                        <exclude>**/FinanceCriticalPathTest**</exclude>
-                        <exclude>**/AppointmentServiceTest*</exclude>
-                    </excludes>
+                    <failIfNoTests>true</failIfNoTests>
                 </configuration>
             </plugin>
         </plugins>

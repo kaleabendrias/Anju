@@ -13,6 +13,8 @@ import java.util.List;
 public interface VacancyPeriodRepository extends JpaRepository<VacancyPeriod, Long> {
 
     List<VacancyPeriod> findByPropertyIdAndIsActiveTrue(Long propertyId);
+    
+    List<VacancyPeriod> findByCreatedBy(Long createdBy);
 
     @Query("SELECT v FROM VacancyPeriod v WHERE v.property.id = :propertyId AND v.isActive = true " +
            "AND ((v.endDate IS NULL AND v.startDate <= :date) OR " +

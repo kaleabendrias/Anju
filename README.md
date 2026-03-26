@@ -90,7 +90,7 @@ SecondaryVerificationServiceTest
 docker compose run --rm anju-backend mvn test -Dtest=AppointmentServiceTest
 
 # Run specific test method
-docker compose run --rm anju-backend mvn test -Dtest=AppointmentServiceTest#shouldCalculateTenPercentPenalty
+docker compose run --rm anju-backend mvn test -Dtest=ApiResponseTest#shouldCreateSuccessResponseWithData
 ```
 
 ## API Usage Examples
